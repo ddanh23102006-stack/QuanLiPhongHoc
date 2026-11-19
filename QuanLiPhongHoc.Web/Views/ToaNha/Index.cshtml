@@ -1,0 +1,136 @@
+@model ToaNhaQuanLyVm
+@{
+    ViewData["Title"] = "Quản lý tòa nhà";
+    string MauTrangThai(string tt) => tt switch
+    {
+        "ACTIVE" => "bg-tertiary-container/15 text-tertiary",
+        "MAINTENANCE" => "bg-amber-50 text-amber-700 border border-amber-300",
+        _ => "bg-error-container text-on-error-container"
+    };
+}
+<div class="flex flex-wrap items-center justify-between gap-space-md mb-space-md">
+  <div>
+    <div class="text-xs text-on-surface-variant">CSVC / <span class="text-primary font-bold">Tòa nhà</span></div>
+    <h1 class="text-xl font-bold">Quản lý tòa nhà</h1>
+    <p class="text-sm text-on-surface-variant mt-1">Thông tin tòa nhà, phòng học, thiết bị và sự cố hạ tầng trong từng tòa.</p>
+  </div>
+  <a class="flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-primary-container text-on-primary font-semibold text-sm shadow-sm transition-all active:scale-[0.98]" href="/ToaNha/Create">
+    <span class="material-symbols-outlined text-[18px]">add</span>
+    <span>Thêm tòa nhà</span>
+  </a>
+</div>
+
+<div class="grid grid-cols-2 lg:grid-cols-4 gap-space-md mb-space-md">
+  <div class="bg-surface-container-lowest rounded-xl p-space-lg shadow-sm">
+    <div class="text-xs uppercase text-on-surface-variant font-semibold">Tổng tòa nhà</div>
+    <div class="text-2xl font-bold mt-1">@Model.TongToa</div>
+    <p class="text-xs text-on-surface-variant mt-1">@Model.TongPhong phòng học</p>
+  </div>
+  <div class="bg-surface-container-lowest rounded-xl p-space-lg shadow-sm">
+    <div class="text-xs uppercase text-on-surface-variant font-semibold">Đang hoạt động</div>
+    <div class="text-2xl font-bold text-tertiary mt-1">@Model.DangHoatDong</div>
+    <p class="text-xs text-on-surface-variant mt-1">Sẵn sàng đưa vào sử dụng</p>
+  </div>
+  <div class="bg-surface-container-lowest rounded-xl p-space-lg shadow-sm">
+    <div class="text-xs uppercase text-on-surface-variant font-semibold">Đang bảo trì</div>
+    <div class="text-2xl font-bold text-amber-700 mt-1">@Model.BaoTri</div>
+    <p class="text-xs text-on-surface-variant mt-1">Phòng thuộc tòa tạm ngưng nhận lịch</p>
+  </div>
+  <div class="bg-surface-container-lowest rounded-xl p-space-lg shadow-sm">
+    <div class="text-xs uppercase text-on-surface-variant font-semibold">Ngừng hoạt động</div>
+    <div class="text-2xl font-bold text-error mt-1">@Model.NgungHoatDong</div>
+    <p class="text-xs text-on-surface-variant mt-1">Không cho mượn phòng</p>
+  </div>
+</div>
+
+<form method="get" class="flex flex-wrap gap-2 mb-space-md bg-surface-container-lowest p-space-md rounded-xl">
+  <input name="q" value="@Model.Q" placeholder="Mã, tên hoặc địa chỉ tòa nhà" class="rounded-lg bg-surface-container-low px-3 py-2 text-sm flex-1 min-w-[220px] max-w-md" />
+  <select name="tt" class="rounded-lg bg-surface-container-low px-3 py-2 text-sm">
+    <option value="">Tất cả trạng thái</option>
+    @foreach (var kv in Catalogs.TrangThaiToaNha)
+    {
+      <option value="@kv.Key" selected="@(Model.TrangThai == kv.Key)">@kv.Value</option>
+    }
+  </select>
+  <button class="px-3 py-2 bg-primary text-on-primary rounded-lg text-sm font-semibold">Lọc</button>
+  @if (!string.IsNullOrWhiteSpace(Model.Q) || !string.IsNullOrWhiteSpace(Model.TrangThai))
+  {
+    <a href="/ToaNha" class="px-3 py-2 rounded-lg bg-surface-container text-on-surface text-sm">Xóa lọc</a>
+  }
+</form>
+
+<div class="bg-surface-container-lowest rounded-xl shadow-sm overflow-hidden">
+<div class="overflow-x-auto">
+<table class="w-full text-sm">
+  <thead class="bg-surface-container text-left">
+    <tr>
+      <th class="p-3">Mã</th>
+      <th class="p-3">Tòa nhà</th>
+      <th class="p-3">Tầng</th>
+      <th class="p-3">Phòng học</th>
+      <th class="p-3">Thiết bị</th>
+      <th class="p-3">Sự cố mở</th>
+      <th class="p-3">Trạng thái</th>
+      <th class="p-3"></th>
+    </tr>
+  </thead>
+  <tbody>
+  @foreach (var row in Model.Rows)
+  {
+    var t = row.ToaNha;
+    <tr class="border-t border-surface-container hover:bg-surface-container-low align-top">
+      <td class="p-3 font-mono font-bold text-primary">
+        <a href="/ToaNha/Details/@t.MaToaNha">@t.CodeToaNha</a>
+      </td>
+      <td class="p-3">
+        <div class="font-semibold">@t.TenToaNha</div>
+        <div class="text-xs text-on-surface-variant">@(string.IsNullOrWhiteSpace(t.DiaChi) ? "Chưa cập nhật địa chỉ" : t.DiaChi)</div>
+      </td>
+      <td class="p-3 font-mono">@(t.SoTang?.ToString() ?? "—")</td>
+      <td class="p-3">
+        <div class="font-semibold">@row.SoPhong phòng</div>
+        <div class="text-xs text-on-surface-variant">@row.SucChua chỗ · @row.PhongBaoTri bảo trì</div>
+      </td>
+      <td class="p-3">
+        <div class="font-semibold">@row.ThietBi</div>
+        <div class="text-xs @(row.ThietBiCanXuLy > 0 ? "text-error font-semibold" : "text-on-surface-variant")">@row.ThietBiCanXuLy cần xử lý</div>
+      </td>
+      <td class="p-3">
+        @if (row.SuCoMo > 0)
+        {
+          <span class="px-2 py-0.5 rounded bg-error-container text-on-error-container text-xs font-semibold">@row.SuCoMo</span>
+        }
+        else
+        {
+          <span class="text-xs text-on-surface-variant">0</span>
+        }
+      </td>
+      <td class="p-3">
+        <span class="px-2 py-0.5 rounded text-xs font-semibold @MauTrangThai(t.TrangThaiHoatDong)">@Catalogs.LabelTrangThaiToaNha(t.TrangThaiHoatDong)</span>
+      </td>
+      <td class="p-3 whitespace-nowrap">
+        <div class="flex items-center justify-center gap-1">
+          <a href="/ToaNha/Details/@t.MaToaNha" title="Xem chi tiết" class="p-1.5 text-secondary hover:bg-surface-container rounded transition-colors">
+            <span class="material-symbols-outlined text-[18px]">visibility</span>
+          </a>
+          <a href="@Url.Action("Edit", "ToaNha", new { id = t.MaToaNha, returnUrl = Context.Request.Path.ToString() + Context.Request.QueryString.ToString() })" title="Chỉnh sửa" class="p-1.5 text-primary hover:bg-surface-container rounded transition-colors">
+            <span class="material-symbols-outlined text-[18px]">edit</span>
+          </a>
+          <form asp-action="Delete" asp-route-id="@t.MaToaNha" method="post" class="inline"
+                onsubmit="return confirm('Xóa hẳn tòa @t.CodeToaNha khỏi danh mục? Tòa còn phòng học sẽ không xóa được.');">
+            <button type="submit" title="Xóa tòa nhà" class="p-1.5 text-error hover:bg-error-container/30 rounded transition-colors cursor-pointer">
+              <span class="material-symbols-outlined text-[18px]">delete</span>
+            </button>
+          </form>
+        </div>
+      </td>
+    </tr>
+  }
+  @if (Model.Rows.Count == 0)
+  {
+    <tr><td colspan="8" class="p-6 text-center text-on-surface-variant">Không có tòa nhà nào khớp bộ lọc.</td></tr>
+  }
+  </tbody>
+</table>
+</div>
+</div>

@@ -1,0 +1,73 @@
+@model QuanLiPhongHoc.Web.Models.ViewModels.PhanTrangVm
+@{
+    var batDau = Math.Max(1, Model.Trang - 2);
+    var ketThuc = Math.Min(Model.SoTrang, batDau + 4);
+    batDau = Math.Max(1, ketThuc - 4);
+    const string nut = "inline-flex items-center justify-center min-w-[32px] h-8 px-2 rounded-lg border font-label-md text-label-md transition-colors";
+    const string nutThuong = "border-outline-variant text-on-surface-variant hover:bg-surface-container hover:text-primary";
+    const string nutKhoa = "border-outline-variant/60 text-outline cursor-not-allowed";
+    const string nutHienTai = "border-primary bg-primary text-on-primary font-semibold";
+}
+<div class="px-3 py-2.5 bg-surface-container-lowest flex flex-col sm:flex-row sm:items-center justify-between gap-2 font-body-sm text-body-sm">
+    <span class="text-on-surface-variant">
+        Hiển thị <strong class="text-on-surface">@Model.Tu–@Model.Den</strong> trong
+        <strong class="text-on-surface">@Model.TongSo</strong> @Model.DonVi
+        @if (Model.SoTrang > 1)
+        {
+            <text>· trang @Model.Trang/@Model.SoTrang</text>
+        }
+    </span>
+
+    @if (Model.SoTrang > 1)
+    {
+        <nav class="flex items-center gap-1 flex-wrap" aria-label="Phân trang">
+            @if (Model.Trang > 1)
+            {
+                <a href="@Model.TaoUrl(1)" class="@nut @nutThuong" title="Trang đầu" aria-label="Trang đầu">
+                    <span class="material-symbols-outlined text-[18px]">first_page</span>
+                </a>
+                <a href="@Model.TaoUrl(Model.Trang - 1)" class="@nut @nutThuong" rel="prev">
+                    <span class="material-symbols-outlined text-[18px]">chevron_left</span>
+                    <span class="hidden sm:inline">Trước</span>
+                </a>
+            }
+            else
+            {
+                <span class="@nut @nutKhoa" aria-disabled="true">
+                    <span class="material-symbols-outlined text-[18px]">first_page</span>
+                </span>
+                <span class="@nut @nutKhoa" aria-disabled="true">
+                    <span class="material-symbols-outlined text-[18px]">chevron_left</span>
+                    <span class="hidden sm:inline">Trước</span>
+                </span>
+            }
+
+            @for (var p = batDau; p <= ketThuc; p++)
+            {
+                <a href="@Model.TaoUrl(p)" class="@nut @(p == Model.Trang ? nutHienTai : nutThuong)"
+                   aria-current="@(p == Model.Trang ? "page" : null)">@p</a>
+            }
+
+            @if (Model.Trang < Model.SoTrang)
+            {
+                <a href="@Model.TaoUrl(Model.Trang + 1)" class="@nut @nutThuong" rel="next">
+                    <span class="hidden sm:inline">Sau</span>
+                    <span class="material-symbols-outlined text-[18px]">chevron_right</span>
+                </a>
+                <a href="@Model.TaoUrl(Model.SoTrang)" class="@nut @nutThuong" title="Trang cuối" aria-label="Trang cuối">
+                    <span class="material-symbols-outlined text-[18px]">last_page</span>
+                </a>
+            }
+            else
+            {
+                <span class="@nut @nutKhoa" aria-disabled="true">
+                    <span class="hidden sm:inline">Sau</span>
+                    <span class="material-symbols-outlined text-[18px]">chevron_right</span>
+                </span>
+                <span class="@nut @nutKhoa" aria-disabled="true">
+                    <span class="material-symbols-outlined text-[18px]">last_page</span>
+                </span>
+            }
+        </nav>
+    }
+</div>

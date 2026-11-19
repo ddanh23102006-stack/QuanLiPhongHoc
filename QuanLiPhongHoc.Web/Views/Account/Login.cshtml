@@ -1,0 +1,60 @@
+@model LoginViewModel
+@{
+    Layout = null;
+}
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Đăng nhập TDMU ID</title>
+  <script src="/lib/tailwind/tailwindcss.js"></script>
+  <script>
+    tailwind.config = { theme: { extend: { colors: { brand: { green: '#22a053', 'green-hover': '#1b8744', 'blue-link': '#0969da', field: '#ebf3fb' } } } } }
+  </script>
+  <style>
+    .input-specimen { background:#ebf3fb; border:1px solid #c2dbf3; }
+    .input-specimen:focus { background:#f4f8fe; border-color:#5ea3e6; box-shadow:0 0 0 3px rgba(94,163,230,.25); outline:none; }
+  </style>
+</head>
+<body class="min-h-screen bg-[#f8fafc] text-slate-700 flex flex-col justify-between items-center px-4 py-8">
+  <header class="w-full max-w-xl text-center pt-2 pb-6">
+    <h1 class="text-xl md:text-2xl font-light text-slate-600 flex items-center justify-center gap-2">Kết nối với
+      <img src="/img/logo-tdmu.png" class="w-7 h-7 object-contain" alt="Logo" />
+    </h1>
+    <p class="text-sm text-slate-500 mt-2">Đăng nhập bằng tài khoản <span class="font-medium text-slate-700">TDMU ID</span> để truy cập Hệ thống Quản lý Phòng học</p>
+  </header>
+  <main class="w-full max-w-[440px] my-auto">
+    <div class="bg-white rounded-xl border border-slate-200 shadow-[0_4px_25px_-4px_rgba(0,0,0,0.06)] px-7 py-8 sm:px-9">
+      <div class="flex flex-col items-center text-center">
+        <img src="/img/logo-tdmu.png" class="w-24 h-24 object-contain mb-3" alt="Logo TDMU" />
+        <h2 class="text-base font-semibold text-slate-800 mt-2 mb-6">Đăng nhập với tài khoản TDMU ID</h2>
+      </div>
+      <form asp-action="Login" method="post" class="space-y-4">
+        <input type="hidden" name="returnUrl" value="@ViewBag.ReturnUrl" />
+        <div asp-validation-summary="ModelOnly" class="text-red-600 text-sm"></div>
+        @if (TempData["Ok"] != null)
+        {
+          <div class="rounded-md border border-emerald-200 bg-emerald-50 px-3.5 py-2.5 text-sm text-emerald-800">@TempData["Ok"]</div>
+        }
+        <div>
+          <input asp-for="MaNguoiDung" class="input-specimen block w-full rounded-md px-3.5 py-2.5 text-sm font-mono" placeholder="Mã số sinh viên / Giảng viên" />
+        </div>
+        <div class="relative">
+          <input asp-for="MatKhau" class="input-specimen block w-full rounded-md px-3.5 py-2.5 text-sm pr-10" placeholder="••••••••" />
+        </div>
+        <div class="hidden flex justify-end">
+          <a asp-action="ForgotPassword" class="text-xs text-[#0969da] hover:underline">Quên mật khẩu?</a>
+        </div>
+        <label class="inline-flex items-center gap-2.5 text-sm text-slate-600">
+          <input asp-for="GhiNho" class="w-4 h-4 rounded border-slate-300 text-emerald-600" />
+          Ghi nhớ thông tin của tôi
+        </label>
+        <button type="submit" class="w-full bg-[#22a053] hover:bg-[#1b8845] text-white font-bold py-2.5 rounded-md text-sm uppercase tracking-wider">ĐĂNG NHẬP</button>
+        <p class="text-xs text-slate-400">Tài khoản mẫu: AD01 / CSVC501 / ST501 / GV1005 / SV202601 — mật khẩu <code>123456</code></p>
+      </form>
+    </div>
+  </main>
+  <footer class="text-xs text-slate-400 py-4">© 2026 Trường Đại học Thủ Dầu Một (TDMU) - Cổng Quản lý Phòng học</footer>
+</body>
+</html>

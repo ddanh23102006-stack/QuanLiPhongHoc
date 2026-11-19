@@ -1,0 +1,78 @@
+@model IReadOnlyList<ThongBao>
+@{
+    ViewData["Title"] = "Thông báo";
+    var q = ViewBag.Q as string;
+    var page = (int)ViewBag.Page;
+    var soTrang = (int)ViewBag.SoTrang;
+    string Trang(int p) => $"/ThongBao?page={p}{(string.IsNullOrWhiteSpace(q) ? "" : "&q=" + Uri.EscapeDataString(q))}";
+}
+
+<nav class="flex items-center gap-2 mb-4 text-on-surface-variant font-label-md text-label-md">
+    <a class="hover:text-primary transition-colors flex items-center gap-1" href="/">
+        <span class="material-symbols-outlined text-[16px]">home</span>
+        Trang chủ
+    </a>
+    <span class="material-symbols-outlined text-[14px] text-outline">chevron_right</span>
+    <span class="text-primary font-semibold">Thông báo phòng học &amp; CSVC</span>
+</nav>
+
+<div class="flex flex-col sm:flex-row sm:items-center justify-between pb-4 mb-4 border-b border-outline-variant/80 gap-2">
+    <h1 class="font-headline-md text-headline-md text-primary font-bold">Thông báo</h1>
+    <span class="text-xs text-on-surface-variant">@ViewBag.TongSo bản tin</span>
+</div>
+
+<section class="bg-surface-container-lowest border border-outline-variant/80 rounded-xl shadow-sm overflow-hidden mb-6">
+    <form method="get" class="p-4 border-b border-[#dbe8f2] flex items-center gap-2">
+        <input name="q" value="@q" placeholder="Tìm theo tiêu đề hoặc nội dung thông báo"
+               class="flex-1 rounded-lg border-outline-variant text-sm focus:border-primary focus:ring-primary" />
+        <button type="submit" class="px-4 py-2 rounded-lg bg-primary text-on-primary text-sm font-semibold hover:bg-primary-container transition-colors">Tìm</button>
+        @if (!string.IsNullOrWhiteSpace(q))
+        {
+            <a href="/ThongBao" class="px-3 py-2 rounded-lg border border-outline-variant text-sm text-on-surface-variant hover:bg-surface-container-low">Bỏ lọc</a>
+        }
+    </form>
+
+    @if (Model.Count == 0)
+    {
+        <p class="p-8 text-center text-sm text-on-surface-variant italic">Không tìm thấy thông báo nào.</p>
+    }
+    else
+    {
+        <div class="px-3 py-2 divide-y divide-slate-100">
+            @foreach (var tin in Model)
+            {
+                <a class="py-3 flex items-baseline justify-between gap-4 group hover:bg-slate-50/70 px-2 rounded transition-colors" href="/ThongBao/Details/@tin.MaThongBao">
+                    <span class="flex items-start gap-2 flex-1">
+                        <span class="text-[#086a9f] font-bold text-sm select-none leading-tight mt-0.5">»</span>
+                        <span class="text-[14px] @(tin.LaMoi ? "font-bold" : "font-medium") text-slate-800 group-hover:text-[#086a9f] transition-colors leading-snug">
+                            @if (tin.LaMoi)
+                            {
+                                <span class="inline-block bg-[#8e24aa] text-white text-[10px] font-bold px-1.5 py-0.5 rounded mr-1 align-baseline uppercase">Mới</span>
+                            }
+                            @tin.TieuDe
+                        </span>
+                    </span>
+                    <span class="text-[12px] text-slate-500 whitespace-nowrap shrink-0">@tin.NgayDang.ToString("dd/MM/yyyy")</span>
+                </a>
+            }
+        </div>
+    }
+</section>
+
+@if (soTrang > 1)
+{
+    <nav class="flex items-center justify-center gap-1.5 text-sm">
+        @if (page > 1)
+        {
+            <a href="@Trang(page - 1)" class="px-3 py-1.5 rounded-lg border border-outline-variant text-on-surface-variant hover:bg-surface-container-low">‹ Trước</a>
+        }
+        @for (var p = 1; p <= soTrang; p++)
+        {
+            <a href="@Trang(p)" class="px-3 py-1.5 rounded-lg border @(p == page ? "bg-primary text-on-primary border-primary font-semibold" : "border-outline-variant text-on-surface-variant hover:bg-surface-container-low")">@p</a>
+        }
+        @if (page < soTrang)
+        {
+            <a href="@Trang(page + 1)" class="px-3 py-1.5 rounded-lg border border-outline-variant text-on-surface-variant hover:bg-surface-container-low">Sau ›</a>
+        }
+    </nav>
+}

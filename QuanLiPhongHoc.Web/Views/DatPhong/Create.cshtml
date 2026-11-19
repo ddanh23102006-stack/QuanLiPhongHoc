@@ -1,0 +1,584 @@
+@model DatPhongCreateVm
+@{
+    ViewData["Title"] = "Đăng ký mượn phòng";
+    var f = Model.Filter;
+    var stTrong = Catalogs.Label(Catalogs.TrangThaiMuonPhong, Catalogs.PhongTrong);
+    var phongChon = Model.Phong.FirstOrDefault(x => x.MaPhong == Model.Phieu.MaPhong);
+    var coLoi = !ViewData.ModelState.IsValid;
+    var coLoiXetDuyet = ViewData.ModelState[string.Empty]?.Errors.Count > 0;
+    var moTaTimKiem = f.XinMuon is (TimeOnly tu, TimeOnly den)
+        ? $"từ {Catalogs.MoTaKhoang(tu, den)}"
+        : "cả ngày";
+}
+
+<!-- Breadcrumb -->
+<nav class="flex items-center gap-1.5 text-body-sm font-body-sm text-secondary mb-3">
+    <span class="material-symbols-outlined text-[16px]">home</span>
+    <a href="/Home" class="hover:text-primary">Trang chủ</a>
+    <span class="text-outline">/</span>
+    <span class="text-on-surface-variant">@(User.IsInRole(AppRoles.Lecturer) ? "Giảng viên" : "Sinh viên")</span>
+    <span class="text-outline">/</span>
+    <span class="text-primary font-semibold">Đăng ký mượn phòng</span>
+</nav>
+
+<!-- Banner -->
+<section class="bg-surface-container-lowest border border-outline-variant rounded-lg p-4 mb-4 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-3">
+    <div class="flex items-start gap-3">
+        <div class="w-10 h-10 rounded-lg bg-secondary-container text-primary flex items-center justify-center flex-shrink-0">
+            <span class="material-symbols-outlined">meeting_room</span>
+        </div>
+        <div>
+            <h1 class="font-headline-lg text-headline-lg font-bold text-on-surface uppercase tracking-tight">Đăng ký mượn phòng học &amp; sinh hoạt</h1>
+            <p class="font-body-sm text-body-sm text-on-surface-variant mt-0.5">
+                Chọn ngày, nhập khung giờ bạn cần dùng. Hệ thống chỉ liệt kê phòng còn trống đúng khung giờ đó.
+            </p>
+        </div>
+    </div>
+    <a href="/DatPhong" class="shrink-0 self-center inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-surface-container border border-outline-variant hover:bg-surface-container-high font-label-md text-label-md text-on-surface transition-colors">
+        <span class="material-symbols-outlined text-[18px]">assignment</span>
+        <span>Phiếu của tôi</span>
+    </a>
+</section>
+
+<!-- Trợ lý tìm phòng -->
+<section id="troLyPanel" class="relative overflow-hidden bg-surface-container-lowest border border-primary/30 rounded-lg p-4 mb-5 shadow-sm">
+    <div class="absolute inset-y-0 left-0 w-1 bg-gradient-to-b from-primary to-tertiary"></div>
+    <div class="flex items-start gap-3">
+        <div class="w-10 h-10 rounded-lg bg-primary text-on-primary flex items-center justify-center flex-shrink-0 shadow-sm">
+            <span class="material-symbols-outlined">auto_awesome</span>
+        </div>
+        <div class="min-w-0 flex-1">
+            <div class="flex flex-wrap items-center gap-2">
+                <h2 class="font-headline-md text-headline-md font-bold text-on-surface">Trợ lý tìm phòng</h2>
+                <span class="px-2 py-0.5 rounded-full bg-secondary-container text-on-secondary-container font-label-sm text-label-sm">Hiểu câu tiếng Việt</span>
+            </div>
+            <p class="font-body-sm text-body-sm text-on-surface-variant mt-0.5">
+                Hỏi bằng câu tự nhiên, trợ lý tự hiểu ngày giờ, tòa nhà, sức chứa, thiết bị và chỉ gợi ý phòng thật sự còn trống — không trùng lịch học hay phiếu đã có.
+            </p>
+
+            <form id="troLyForm" class="mt-2.5 flex flex-col sm:flex-row gap-2" autocomplete="off">
+                <div class="relative flex-1">
+                    <span class="material-symbols-outlined absolute left-2.5 top-2 text-[18px] text-secondary pointer-events-none">chat</span>
+                    <input id="troLyInput" type="text" maxlength="300"
+                           placeholder="VD: Chiều mai 2h–4h, phòng 60 chỗ có máy chiếu ở tòa A2"
+                           class="w-full h-[38px] bg-surface-container-lowest border border-outline-variant rounded-lg pl-9 pr-3 font-body-sm text-body-sm focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary text-on-surface" />
+                </div>
+                <button id="troLyBtn" type="submit"
+                        class="h-[38px] px-4 bg-primary hover:bg-primary-container text-on-primary rounded-lg font-label-md text-label-md font-bold flex items-center justify-center gap-1.5 transition-colors disabled:opacity-60 disabled:cursor-wait">
+                    <span class="material-symbols-outlined text-[18px]">search</span>
+                    <span id="troLyBtnText">Tìm phòng</span>
+                </button>
+            </form>
+
+            <div class="mt-2 flex flex-wrap gap-1.5" id="troLyExamples">
+                <button type="button" data-cau="Sáng mai, phòng 60 chỗ ở tòa A2"
+                        class="px-2.5 py-1 rounded-full border border-outline-variant bg-surface-container text-on-surface-variant font-label-sm text-label-sm hover:border-primary hover:text-primary transition-colors cursor-pointer">
+                    Sáng mai, phòng 60 chỗ tòa A2
+                </button>
+                <button type="button" data-cau="Thứ 6 tuần này 14h-16h, phòng thực hành"
+                        class="px-2.5 py-1 rounded-full border border-outline-variant bg-surface-container text-on-surface-variant font-label-sm text-label-sm hover:border-primary hover:text-primary transition-colors cursor-pointer">
+                    Thứ 6, 14h–16h, phòng thực hành
+                </button>
+                <button type="button" data-cau="Mai 8h-10h, phòng có máy chiếu"
+                        class="px-2.5 py-1 rounded-full border border-outline-variant bg-surface-container text-on-surface-variant font-label-sm text-label-sm hover:border-primary hover:text-primary transition-colors cursor-pointer">
+                    Mai 8h–10h, có máy chiếu
+                </button>
+            </div>
+
+            <div id="troLyKetQua" class="mt-3 hidden"></div>
+        </div>
+    </div>
+</section>
+
+<!-- Filter bar -->
+<form id="boLocForm" method="get" action="/DatPhong/Create" class="bg-surface-container-lowest border border-outline-variant rounded-lg p-4 mb-5 shadow-sm">
+    <div class="flex items-center justify-between mb-3 border-b border-outline-variant pb-2">
+        <span class="font-label-lg text-label-lg font-bold text-primary flex items-center gap-1.5">
+            <span class="material-symbols-outlined text-[20px]">filter_alt</span>
+            <span>Bộ lọc phòng học &amp; Thời gian</span>
+        </span>
+        <span class="font-body-sm text-body-sm text-on-surface-variant">
+            Ngày @f.Ngay.ToString("dd/MM/yyyy") • @moTaTimKiem — tìm thấy
+            <strong class="text-primary">@Model.Phong.Count phòng</strong>
+        </span>
+    </div>
+
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+        <div>
+            <label class="block font-label-md text-label-md text-on-surface mb-1" for="toa">Tòa nhà</label>
+            <select id="toa" name="toa" class="w-full h-[36px] bg-surface-container-lowest border border-outline-variant rounded-lg px-2.5 font-body-sm text-body-sm focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary text-on-surface">
+                <option value="">Tất cả các tòa</option>
+                @foreach (var t in Model.DanhSachToa)
+                {
+                    <option value="@t.MaToaNha" selected="@(f.MaToaNha == t.MaToaNha)">@t.CodeToaNha — @t.TenToaNha</option>
+                }
+            </select>
+        </div>
+        <div>
+            <label class="block font-label-md text-label-md text-on-surface mb-1" for="loai">Loại phòng</label>
+            <select id="loai" name="loai" class="w-full h-[36px] bg-surface-container-lowest border border-outline-variant rounded-lg px-2.5 font-body-sm text-body-sm focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary text-on-surface">
+                <option value="">Tất cả loại phòng</option>
+                @foreach (var lp in Catalogs.LoaiPhong)
+                {
+                    <option value="@lp.Key" selected="@(f.LoaiPhong == lp.Key)">@lp.Value</option>
+                }
+            </select>
+        </div>
+        <div>
+            <label class="block font-label-md text-label-md text-on-surface mb-1" for="ngay">Ngày mượn</label>
+            <div class="relative">
+                <span class="material-symbols-outlined absolute left-2 top-2 text-[18px] text-secondary pointer-events-none">calendar_today</span>
+                <input id="ngay" name="ngay" type="date" value="@f.Ngay.ToString("yyyy-MM-dd")" min="@DateTime.Today.ToString("yyyy-MM-dd")"
+                       class="w-full h-[36px] bg-surface-container-lowest border border-outline-variant rounded-lg pl-8 pr-2.5 font-body-sm text-body-sm focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary text-on-surface" />
+            </div>
+        </div>
+        <div>
+            <label class="block font-label-md text-label-md text-on-surface mb-1">Khung giờ cần mượn</label>
+            <div class="flex items-center gap-1.5">
+                <input name="tu" type="text" data-gio inputmode="numeric" maxlength="8" autocomplete="off" placeholder="HH:mm" value="@f.Tu?.ToString("HH:mm")" aria-label="Từ giờ"
+                       class="w-full h-[36px] bg-surface-container-lowest border border-outline-variant rounded-lg px-2 font-body-sm text-body-sm focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary text-on-surface" />
+                <span class="text-outline">–</span>
+                <input name="den" type="text" data-gio inputmode="numeric" maxlength="8" autocomplete="off" placeholder="HH:mm" value="@f.Den?.ToString("HH:mm")" aria-label="Đến giờ"
+                       class="w-full h-[36px] bg-surface-container-lowest border border-outline-variant rounded-lg px-2 font-body-sm text-body-sm focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary text-on-surface" />
+            </div>
+        </div>
+        <div>
+            <label class="block font-label-md text-label-md text-on-surface mb-1" for="q">Tìm nhanh mã phòng</label>
+            <div class="relative">
+                <span class="material-symbols-outlined absolute left-2 top-2 text-[18px] text-secondary pointer-events-none">search</span>
+                <input id="q" name="q" type="text" value="@f.Q" placeholder="VD: C.101, I4.211..."
+                       class="w-full h-[36px] bg-surface-container-lowest border border-outline-variant rounded-lg pl-8 pr-2.5 font-body-sm text-body-sm focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary text-on-surface" />
+            </div>
+        </div>
+    </div>
+
+    <div class="mt-4 pt-3 border-t border-outline-variant flex flex-wrap items-center justify-between gap-3 font-label-md text-label-md">
+        <div class="flex flex-wrap items-center gap-4">
+            <span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-full bg-emerald-500"></span><span class="text-on-surface-variant">Chỉ hiển thị phòng @stTrong (còn khung giờ trống) — @Model.PhongTrong</span></span>
+            <span class="text-[12px] text-outline">Phòng đã kín giờ, đang có lớp hoặc đang bảo trì được ẩn khỏi danh sách.</span>
+        </div>
+        <div class="flex items-center gap-3">
+            <button type="submit" class="bg-primary text-on-primary hover:bg-primary-container px-3 py-1.5 rounded-lg font-label-md text-label-md font-semibold flex items-center gap-1 transition-colors">
+                <span class="material-symbols-outlined text-[18px]">filter_list</span>
+                <span>Lọc kết quả</span>
+            </button>
+            <a href="/DatPhong/Create" class="bg-surface-container border border-outline-variant text-on-surface hover:bg-surface-container-high px-3 py-1.5 rounded-lg font-label-md text-label-md transition-colors">Đặt lại</a>
+        </div>
+    </div>
+</form>
+
+@if (Model.Phong.Count == 0)
+{
+    <section class="bg-surface-container-lowest border border-outline-variant rounded-lg p-10 text-center shadow-sm">
+        <span class="material-symbols-outlined text-[40px] text-outline">no_meeting_room</span>
+        <p class="font-headline-sm text-headline-sm text-on-surface mt-2">Không còn phòng trống @moTaTimKiem</p>
+        <p class="font-body-sm text-body-sm text-on-surface-variant mt-1">Thử đổi ngày, nới khung giờ hoặc bỏ bớt bộ lọc. Giờ đã có lớp hoặc đã có người mượn sẽ không xuất hiện ở đây.</p>
+    </section>
+}
+else
+{
+    <section class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+        @foreach (var p in Model.PhongTrang)
+        {
+            <article class="bg-surface-container-lowest rounded-lg border border-outline-variant shadow-sm hover:border-primary/60 hover:shadow-md transition-all flex flex-col justify-between overflow-hidden"
+                     data-ma-phong="@p.MaPhong" data-ten-phong="@p.CodePhong" data-toa="@p.Toa"
+                     data-suc-chua="@p.SucChua" data-thiet-bi="@string.Join(", ", p.ThietBi)"
+                     data-khung-trong="@string.Join(", ", p.KhungConTrong.Select(x => x.MoTa))">
+                <div>
+                    <div class="px-3 py-1 text-[11px] flex items-center justify-between bg-surface-container-low text-secondary">
+                        <span class="truncate">@p.Toa</span>
+                        <span class="shrink-0">@Catalogs.LabelLoaiPhong(p.LoaiPhong)</span>
+                    </div>
+                    <div class="p-3.5 flex-1">
+                        <div class="flex items-start justify-between mb-2 gap-2">
+                            <div>
+                                <h3 class="font-headline-md text-headline-md font-bold leading-tight text-primary">Phòng @p.CodePhong</h3>
+                                <span class="inline-block font-label-sm text-label-sm text-secondary bg-surface-container px-2 py-0.5 rounded mt-0.5">
+                                    @Catalogs.LabelTrangThaiPhong(p.TrangThaiPhong)
+                                </span>
+                            </div>
+                            <span class="shrink-0 bg-emerald-50 text-emerald-700 border border-emerald-300 font-label-sm text-label-sm px-2 py-0.5 rounded-lg flex items-center gap-1">
+                                <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>@stTrong
+                            </span>
+                        </div>
+
+                        <ul class="space-y-1.5 text-body-sm font-body-sm text-secondary my-3 border-y border-outline-variant/60 py-2.5">
+                            <li class="flex items-center justify-between gap-2">
+                                <span class="flex items-center gap-1.5 shrink-0 text-primary">
+                                    <span class="material-symbols-outlined text-[16px]">group</span><span>Sức chứa:</span>
+                                </span>
+                                <span>@p.SucChua chỗ ngồi</span>
+                            </li>
+                            <li class="flex items-start gap-1.5">
+                                <span class="material-symbols-outlined text-[16px] text-primary shrink-0 mt-0.5">devices</span>
+                                <span class="text-right">@(p.ThietBi.Count > 0 ? string.Join(", ", p.ThietBi) : "Chưa ghi nhận thiết bị")</span>
+                            </li>
+                        </ul>
+
+                        <div class="bg-surface-container-low p-2 rounded border border-outline-variant text-[11px] text-secondary">
+                            <span class="font-bold text-primary">Khung giờ còn trống:</span>
+                            @(p.KhungConTrong.Count > 0 ? string.Join(" · ", p.KhungConTrong.Select(x => x.MoTa)) : "Hết khung giờ trống")
+                        </div>
+                    </div>
+                </div>
+                <div class="p-3.5 pt-0">
+                    <button type="button" class="chon-phong w-full bg-surface-container-lowest text-primary border border-primary hover:bg-surface-container font-label-md text-label-md font-semibold py-2 rounded-lg flex items-center justify-center gap-1.5 transition-colors cursor-pointer">
+                        <span class="material-symbols-outlined text-[18px]">add_circle</span>
+                        <span>Chọn mượn phòng này</span>
+                    </button>
+                </div>
+            </article>
+        }
+    </section>
+    <div class="mt-4 bg-surface-container-lowest border border-outline-variant rounded-lg shadow-sm overflow-hidden">
+        @await Html.PartialAsync("_PhanTrang", Model.PhanTrang)
+    </div>
+}
+
+<!-- Rules -->
+<section class="mt-6 bg-surface-container-lowest border border-outline-variant rounded-lg p-4 shadow-sm">
+    <h4 class="font-headline-sm text-headline-sm font-bold text-primary flex items-center gap-2 mb-2">
+        <span class="material-symbols-outlined text-[20px]">info</span>
+        <span>Lưu ý và Quy định mượn phòng học tại Trường Đại học Thủ Dầu Một</span>
+    </h4>
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-3 font-body-sm text-body-sm text-secondary">
+        <div class="p-2.5 bg-surface-container-low rounded border border-outline-variant">
+            <p class="font-bold text-on-surface">1. Thời hạn nộp phiếu</p>
+            <p class="text-[12px] mt-1">Đơn đăng ký cần gửi trước ít nhất 24 giờ so với thời gian sử dụng để Ban Quản lý CSVC xét duyệt.</p>
+        </div>
+        <div class="p-2.5 bg-surface-container-low rounded border border-outline-variant">
+            <p class="font-bold text-on-surface">2. Khung giờ xin mượn</p>
+            <p class="text-[12px] mt-1">Giờ mượn phải nằm trọn trong khung giờ trống của phòng và không trùng giờ đã có lớp hoặc đã có người mượn.</p>
+        </div>
+        <div class="p-2.5 bg-surface-container-low rounded border border-outline-variant">
+            <p class="font-bold text-on-surface">3. Hủy hoặc thay đổi</p>
+            <p class="text-[12px] mt-1">Nếu không còn nhu cầu, vào mục "Phiếu của tôi" để Hủy yêu cầu nhằm giải phóng phòng cho người khác.</p>
+        </div>
+    </div>
+</section>
+
+<!-- Modal -->
+<div id="bookingModal" class="fixed inset-0 z-50 hidden items-center justify-center bg-inverse-surface/60 backdrop-blur-xs p-4">
+    <form asp-action="Create" method="post" class="bg-surface-container-lowest w-full max-w-2xl rounded-lg shadow-2xl border border-outline-variant flex flex-col max-h-[90vh] overflow-hidden">
+        <div class="bg-primary px-5 py-3.5 text-on-primary flex items-center justify-between">
+            <div class="flex items-center gap-2">
+                <span class="material-symbols-outlined text-[22px]">post_add</span>
+                <h2 class="font-headline-md text-headline-md font-bold tracking-tight">PHIẾU ĐĂNG KÝ MƯỢN PHÒNG HỌC</h2>
+            </div>
+            <button type="button" class="dong-modal text-on-primary/80 hover:text-on-primary rounded p-1 transition-colors cursor-pointer">
+                <span class="material-symbols-outlined">close</span>
+            </button>
+        </div>
+
+        <div class="p-5 overflow-y-auto custom-scrollbar space-y-4">
+            @if (coLoiXetDuyet)
+            {
+                <div asp-validation-summary="ModelOnly" class="bg-error-container border border-error/30 text-on-error-container rounded-lg px-3 py-2 text-body-sm font-body-sm"></div>
+            }
+
+            <input type="hidden" name="MaPhong" id="inpMaPhong" value="@Model.Phieu.MaPhong" />
+            <input type="hidden" name="page" value="@Model.PhanTrang.Trang" />
+            <input type="hidden" name="toa" value="@f.MaToaNha" />
+            <input type="hidden" name="loai" value="@f.LoaiPhong" />
+            <input type="hidden" name="q" value="@f.Q" />
+
+            <div class="bg-surface-container p-3 rounded-lg border border-primary/30 flex items-start gap-3">
+                <span class="material-symbols-outlined text-[28px] text-primary mt-0.5">meeting_room</span>
+                <div class="min-w-0">
+                    <p class="font-label-sm text-label-sm uppercase tracking-wider text-primary font-bold">Phòng đã chọn</p>
+                    <h3 id="lblPhongDaChon" class="font-headline-sm text-headline-sm font-bold text-on-surface mt-0.5">
+                        @(phongChon is null ? "Chưa chọn phòng" : $"Phòng {phongChon.CodePhong} — {phongChon.Toa}")
+                    </h3>
+                    <p id="lblChiTietPhong" class="font-body-sm text-body-sm text-on-surface-variant mt-0.5">
+                        @(phongChon is null
+                            ? "Nhấn \"Chọn mượn phòng này\" trên thẻ phòng để bắt đầu."
+                            : $"Sức chứa: {phongChon.SucChua} chỗ ngồi | {Catalogs.LabelLoaiPhong(phongChon.LoaiPhong)} | Thiết bị: {(phongChon.ThietBi.Count > 0 ? string.Join(", ", phongChon.ThietBi) : "chưa ghi nhận")}")
+                    </p>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                <div>
+                    <label class="block font-label-md text-label-md text-on-surface mb-1">Họ và tên người đăng ký <span class="text-error">*</span></label>
+                    <input type="text" value="@Model.HoTen" readonly class="w-full h-[36px] bg-surface-container-low border border-outline-variant rounded-lg px-2.5 font-body-sm text-body-sm font-semibold text-on-surface cursor-not-allowed" />
+                </div>
+                <div>
+                    <label class="block font-label-md text-label-md text-on-surface mb-1">Mã tài khoản <span class="text-error">*</span></label>
+                    <input type="text" value="@Model.MaNguoiDung" readonly class="w-full h-[36px] bg-surface-container-low border border-outline-variant rounded-lg px-2.5 font-body-sm text-body-sm font-semibold text-on-surface cursor-not-allowed" />
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 border-t border-outline-variant pt-3">
+                <div>
+                    <label class="block font-label-md text-label-md text-on-surface mb-1" for="inpNgayDat">Ngày mượn phòng <span class="text-error">*</span></label>
+                    <input id="inpNgayDat" name="NgayDat" type="date" value="@Model.Phieu.NgayDat.ToString("yyyy-MM-dd")"
+                           class="w-full h-[36px] bg-surface-container-lowest border border-outline-variant rounded-lg px-2.5 font-body-sm text-body-sm focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary text-on-surface" />
+                    <span class="block text-error text-[11px] mt-0.5">@Html.ValidationMessage("NgayDat")</span>
+                </div>
+                <div>
+                    <label class="block font-label-md text-label-md text-on-surface mb-1" for="inpTu">Bắt đầu mượn <span class="text-error">*</span></label>
+                    <input id="inpTu" name="Tu" type="text" data-gio inputmode="numeric" maxlength="8" autocomplete="off" placeholder="VD: 17:00 hoặc 17h00" value="@Model.Phieu.Tu"
+                           class="w-full h-[36px] bg-surface-container-lowest border border-outline-variant rounded-lg px-2.5 font-body-sm text-body-sm focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary text-on-surface" />
+                    <span class="block text-error text-[11px] mt-0.5">@Html.ValidationMessage("Tu")</span>
+                </div>
+                <div>
+                    <label class="block font-label-md text-label-md text-on-surface mb-1" for="inpDen">Kết thúc mượn <span class="text-error">*</span></label>
+                    <input id="inpDen" name="Den" type="text" data-gio inputmode="numeric" maxlength="8" autocomplete="off" placeholder="VD: 18:00 hoặc 18h00" value="@Model.Phieu.Den"
+                           class="w-full h-[36px] bg-surface-container-lowest border border-outline-variant rounded-lg px-2.5 font-body-sm text-body-sm focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary text-on-surface" />
+                    <span class="block text-error text-[11px] mt-0.5">@Html.ValidationMessage("Den")</span>
+                </div>
+            </div>
+
+            <p class="text-[11px] text-on-surface-variant -mt-1">
+                Khung giờ còn trống của phòng: <span id="lblKhungTrong" class="font-semibold text-primary">@(phongChon is null ? "—" : string.Join(" · ", phongChon.KhungConTrong.Select(x => x.MoTa)))</span>
+            </p>
+
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div class="sm:col-span-2">
+                    <label class="block font-label-md text-label-md text-on-surface mb-1" for="inpMucDich">Mục đích mượn phòng <span class="text-error">*</span></label>
+                    <input id="inpMucDich" name="MucDich" type="text" value="@Model.Phieu.MucDich" maxlength="500"
+                           placeholder="VD: Họp nhóm đồ án, sinh hoạt chi hội, ôn thi OL"
+                           class="w-full h-[36px] bg-surface-container-lowest border border-outline-variant rounded-lg px-2.5 font-body-sm text-body-sm focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary text-on-surface" />
+                    <span class="block text-error text-[11px] mt-0.5">@Html.ValidationMessage("MucDich")</span>
+                </div>
+                <div>
+                    <label class="block font-label-md text-label-md text-on-surface mb-1" for="inpSoLuong">Số người dự kiến <span class="text-error">*</span></label>
+                    <div class="relative">
+                        <input id="inpSoLuong" name="SoLuongNguoiThamGia" type="number" min="1" max="500" value="@Model.Phieu.SoLuongNguoiThamGia"
+                               class="w-full h-[36px] bg-surface-container-lowest border border-outline-variant rounded-lg pl-2.5 pr-14 font-body-sm text-body-sm focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary text-on-surface" />
+                        <span class="absolute right-2.5 top-2 text-secondary text-body-sm">người</span>
+                    </div>
+                    <span class="block text-error text-[11px] mt-0.5">@Html.ValidationMessage("SoLuongNguoiThamGia")</span>
+                </div>
+            </div>
+
+            <div class="bg-surface-container-low p-3 rounded-lg border border-outline-variant">
+                <label class="flex items-start gap-2.5 cursor-pointer">
+                    <input name="CamKet" type="checkbox" value="true" checked="@Model.Phieu.CamKet" class="mt-0.5 w-4 h-4 rounded border-outline text-primary focus:ring-primary" />
+                    <span class="font-body-sm text-body-sm text-on-surface-variant">
+                        Tôi cam kết bảo quản tài sản, thiết bị phòng học, tắt nguồn điện và bàn giao phòng đúng giờ theo quy định của Nhà trường.
+                    </span>
+                </label>
+                <span class="block text-error text-[11px] mt-1">@Html.ValidationMessage("CamKet")</span>
+            </div>
+
+            <div class="pt-2 flex items-center justify-between gap-2.5 border-t border-outline-variant">
+                <button type="button" class="dong-modal px-4 py-2 bg-surface-container border border-outline-variant hover:bg-surface-container-high rounded-lg font-label-md text-label-md text-on-surface transition-colors cursor-pointer">Đóng / Hủy</button>
+                <button type="submit" class="px-5 py-2 bg-primary hover:bg-primary-container text-on-primary rounded-lg font-label-md text-label-md font-bold shadow-sm transition-all flex items-center gap-1.5 cursor-pointer">
+                    <span class="material-symbols-outlined text-[18px]">send</span>
+                    <span>Gửi đơn đăng ký mượn phòng</span>
+                </button>
+            </div>
+        </div>
+    </form>
+</div>
+
+@section Scripts {
+    <script>
+        (() => {
+            const modal = document.getElementById('bookingModal');
+            const inpPhong = document.getElementById('inpMaPhong');
+            const inpTu = document.getElementById('inpTu');
+            const inpDen = document.getElementById('inpDen');
+            const inpNgay = document.getElementById('inpNgayDat');
+            const inpSoLuong = document.getElementById('inpSoLuong');
+            const lblPhong = document.getElementById('lblPhongDaChon');
+            const lblChiTiet = document.getElementById('lblChiTietPhong');
+            const lblKhung = document.getElementById('lblKhungTrong');
+
+            const moModal = () => { modal.classList.remove('hidden'); modal.classList.add('flex'); };
+            const dongModal = () => { modal.classList.add('hidden'); modal.classList.remove('flex'); };
+
+            // Dùng chung cho thẻ phòng và kết quả trợ lý: luôn điền ngày + khung giờ đã xác nhận trống.
+            const moModalPhong = (o) => {
+                inpPhong.value = o.maPhong;
+                lblPhong.textContent = o.toa ? `Phòng ${o.tenPhong} — ${o.toa}` : `Phòng ${o.tenPhong}`;
+                lblChiTiet.textContent = `Sức chứa: ${o.sucChua} chỗ ngồi | Thiết bị: ${o.thietBi || 'Chưa ghi nhận'}`;
+                lblKhung.textContent = o.khungTrong || 'Hết khung giờ trống';
+                inpSoLuong.max = o.sucChua;
+                if (Number(inpSoLuong.value) > Number(o.sucChua)) inpSoLuong.value = o.sucChua;
+                if (o.ngay) inpNgay.value = o.ngay;
+                if (o.tu) inpTu.value = o.tu;
+                if (o.den) inpDen.value = o.den;
+
+                moModal();
+            };
+
+            document.querySelectorAll('.chon-phong').forEach(btn => btn.addEventListener('click', () => {
+                const card = btn.closest('[data-ma-phong]').dataset;
+                const cacKhung = (card.khungTrong || '').split(', ').filter(Boolean);
+                const [tu, den] = (cacKhung[0] || '').split(' - ');
+                moModalPhong({
+                    maPhong: card.maPhong,
+                    tenPhong: card.tenPhong,
+                    toa: card.toa,
+                    sucChua: card.sucChua,
+                    thietBi: card.thietBi,
+                    khungTrong: cacKhung.join(' · '),
+                    ngay: inpNgay.value,
+                    tu: tu || '',
+                    den: den || ''
+                });
+            }));
+
+            // ---------- Trợ lý tìm phòng ----------
+            const troLyForm = document.getElementById('troLyForm');
+            const troLyInput = document.getElementById('troLyInput');
+            const troLyBtn = document.getElementById('troLyBtn');
+            const troLyBtnText = document.getElementById('troLyBtnText');
+            const troLyKetQua = document.getElementById('troLyKetQua');
+            let troLyDangChay = false;
+
+            const esc = (v) => String(v ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+            const thePhong = (p, ngay) => `
+                <article class="bg-surface-container-low border border-outline-variant rounded-lg p-3 flex flex-col gap-2">
+                    <div class="flex items-start justify-between gap-2">
+                        <div class="min-w-0">
+                            <div class="font-headline-sm text-headline-sm font-bold text-primary">Phòng ${esc(p.codePhong)}</div>
+                            <div class="text-[12px] text-secondary truncate">${esc(p.toa || '')}</div>
+                        </div>
+                        <span class="shrink-0 text-[11px] px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-300">${esc(p.sucChua)} chỗ</span>
+                    </div>
+                    <div class="text-[12px] text-on-surface-variant space-y-1">
+                        <div>${esc(p.loaiPhongTen || '')}</div>
+                        <div class="truncate" title="${esc((p.thietBi || []).join(', '))}">Thiết bị: ${esc((p.thietBi || []).join(', ') || 'chưa ghi nhận')}</div>
+                        <div>Trống: ${esc((p.khungTrong || []).join(' · ') || '—')}</div>
+                    </div>
+                    ${p.tu && p.den ? `<div class="text-[11px] text-primary font-semibold">${esc(p.ghiChu || 'Khung gợi ý')}: ${esc(p.tu)} – ${esc(p.den)}</div>` : ''}
+                    <button type="button" class="chon-tu-tro-ly mt-auto w-full bg-primary text-on-primary hover:bg-primary-container font-label-md text-label-md font-semibold py-1.5 rounded-lg transition-colors cursor-pointer"
+                            data-phong="${esc(p.maPhong)}" data-code="${esc(p.codePhong)}" data-toa="${esc(p.toa || '')}"
+                            data-succhua="${esc(p.sucChua)}" data-thietbi="${esc((p.thietBi || []).join(', '))}"
+                            data-khung="${esc((p.khungTrong || []).join(' · '))}"
+                            data-tu="${esc(p.tu || '')}" data-den="${esc(p.den || '')}" data-ngay="${esc(ngay)}">
+                        Chọn mượn phòng này
+                    </button>
+                </article>`;
+
+            const theGoiY = (g, ngay) => `
+                <button type="button" class="chon-tu-tro-ly w-full text-left bg-surface-container-lowest border border-dashed border-outline-variant hover:border-primary rounded-lg px-2.5 py-2 transition-colors cursor-pointer"
+                        data-phong="${esc(g.maPhong)}" data-code="${esc(g.codePhong)}" data-toa="${esc(g.toa || '')}"
+                        data-succhua="${esc(g.sucChua)}" data-thietbi="${esc((g.thietBi || []).join(', '))}"
+                        data-khung="${esc(g.tu)} - ${esc(g.den)}"
+                        data-tu="${esc(g.tu)}" data-den="${esc(g.den)}" data-ngay="${esc(ngay)}">
+                    <div class="font-label-md text-label-md font-bold text-on-surface">Phòng ${esc(g.codePhong)} <span class="font-normal text-on-surface-variant">· ${esc(g.toa || '')}</span></div>
+                    <div class="text-[11px] text-on-surface-variant">${esc(g.moTa)} · ${esc(g.tu)} – ${esc(g.den)} · ${esc(g.sucChua)} chỗ</div>
+                </button>`;
+
+            function veTroLy(d) {
+                const chips = (d.hieu || []).map(x => `<span class="px-2 py-0.5 rounded-full bg-secondary-container text-on-secondary-container font-label-sm text-label-sm">${esc(x)}</span>`).join('');
+                const canhBao = (d.canhBao || []).map(x => `
+                    <div class="flex items-start gap-1.5 text-[12px] text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-2.5 py-1.5">
+                        <span class="material-symbols-outlined text-[16px] mt-px">warning</span><span>${esc(x)}</span>
+                    </div>`).join('');
+                const phong = (d.phong || []).map(p => thePhong(p, d.ngay)).join('');
+                const goiY = (d.goiY || []).map(g => theGoiY(g, d.ngay)).join('');
+
+                let html = `
+                    <div class="rounded-lg border border-outline-variant bg-surface-container-low p-3">
+                        <div class="flex items-start gap-2">
+                            <span class="material-symbols-outlined text-[20px] text-primary mt-0.5">smart_toy</span>
+                            <div class="min-w-0">
+                                <p class="font-body-sm text-body-sm text-on-surface">${esc(d.traLoi)}</p>
+                                ${chips ? `<div class="flex flex-wrap gap-1.5 mt-1.5">${chips}</div>` : ''}
+                            </div>
+                        </div>
+                        ${canhBao ? `<div class="mt-2 space-y-1.5">${canhBao}</div>` : ''}
+                    </div>`;
+
+                if (phong) html += `<div class="grid grid-cols-1 md:grid-cols-2 gap-2.5 mt-2.5">${phong}</div>`;
+                if (goiY) html += `
+                    <div class="mt-3">
+                        <div class="font-label-md text-label-md font-bold text-on-surface mb-1.5 flex items-center gap-1.5">
+                            <span class="material-symbols-outlined text-[18px] text-primary">lightbulb</span> Phương án gần nhất
+                        </div>
+                        <div class="space-y-1.5">${goiY}</div>
+                    </div>`;
+
+                const coBoLoc = d.tu || d.den || d.maToaNha || d.loaiPhong || d.tuKhoaPhong;
+                if (coBoLoc && (phong || goiY)) {
+                    html += `<div class="mt-2 flex justify-end">
+                        <button type="button" id="troLyApDung" class="px-3 py-1.5 rounded-lg border border-primary text-primary hover:bg-surface-container font-label-md text-label-md font-semibold transition-colors cursor-pointer">
+                            Áp dụng bộ lọc này vào danh sách
+                        </button>
+                    </div>`;
+                }
+
+                troLyKetQua.innerHTML = html;
+                troLyKetQua.classList.remove('hidden');
+
+                troLyKetQua.querySelectorAll('.chon-tu-tro-ly').forEach(btn => {
+                    btn.addEventListener('click', () => {
+                        const x = btn.dataset;
+                        moModalPhong({
+                            maPhong: x.phong,
+                            tenPhong: x.code,
+                            toa: x.toa,
+                            sucChua: x.succhua,
+                            thietBi: x.thietbi,
+                            khungTrong: x.khung,
+                            ngay: x.ngay,
+                            tu: x.tu,
+                            den: x.den
+                        });
+                        document.getElementById('inpMucDich')?.focus();
+                    });
+                });
+
+                const apDung = document.getElementById('troLyApDung');
+                if (apDung) {
+                    apDung.addEventListener('click', () => {
+                        const form = document.getElementById('boLocForm');
+                        form.querySelector('#ngay').value = d.ngay;
+                        form.querySelector('input[name="tu"]').value = d.tu || '';
+                        form.querySelector('input[name="den"]').value = d.den || '';
+                        form.querySelector('#toa').value = d.maToaNha ?? '';
+                        form.querySelector('#loai').value = d.loaiPhong || '';
+                        form.querySelector('#q').value = d.tuKhoaPhong || '';
+                        form.submit();
+                    });
+                }
+            }
+
+            async function hoiTroLy(cau) {
+                cau = (cau || '').trim();
+                if (!cau || troLyDangChay) return;
+                troLyDangChay = true;
+                troLyBtn.disabled = true;
+                troLyBtnText.textContent = 'Đang tìm…';
+                troLyKetQua.classList.remove('hidden');
+                troLyKetQua.innerHTML = `
+                    <div class="rounded-lg border border-outline-variant bg-surface-container-low px-3 py-2 text-body-sm text-on-surface-variant flex items-center gap-2">
+                        <span class="material-symbols-outlined text-[18px] animate-spin text-primary">progress_activity</span>
+                        Đang đọc câu hỏi và kiểm tra phòng trống…
+                    </div>`;
+                try {
+                    const res = await fetch('/DatPhong/TroLy?cauHoi=' + encodeURIComponent(cau), { headers: { 'Accept': 'application/json' } });
+                    if (!res.ok) throw new Error('HTTP ' + res.status);
+                    veTroLy(await res.json());
+                } catch (e) {
+                    troLyKetQua.innerHTML = `
+                        <div class="rounded-lg border border-error/30 bg-error-container px-3 py-2 text-body-sm text-on-error-container">
+                            Trợ lý chưa trả lời được. Bạn thử lại hoặc dùng bộ lọc bên dưới nhé.
+                        </div>`;
+                } finally {
+                    troLyDangChay = false;
+                    troLyBtn.disabled = false;
+                    troLyBtnText.textContent = 'Tìm phòng';
+                }
+            }
+
+            troLyForm.addEventListener('submit', e => { e.preventDefault(); hoiTroLy(troLyInput.value); });
+            document.querySelectorAll('#troLyExamples [data-cau]').forEach(b => b.addEventListener('click', () => {
+                troLyInput.value = b.dataset.cau;
+                hoiTroLy(b.dataset.cau);
+            }));
+
+            document.querySelectorAll('.dong-modal').forEach(b => b.addEventListener('click', dongModal));
+            modal.addEventListener('click', e => { if (e.target === modal) dongModal(); });
+            document.addEventListener('keydown', e => { if (e.key === 'Escape') dongModal(); });
+
+            @if (coLoi) { <text>moModal();</text> }
+        })();
+    </script>
+}

@@ -1,0 +1,85 @@
+@model ThongBaoHomeVm
+@{
+    var noiBat = Model?.TinNoiBat ?? [];
+    var tinKhac = Model?.TinKhac ?? [];
+}
+<section class="bg-surface-container-lowest border border-outline-variant/80 rounded-xl shadow-sm overflow-hidden mb-6">
+    <div class="px-5 pt-4 pb-3 flex items-center justify-between">
+        <div class="flex items-center gap-2">
+            <span class="text-[20px] select-none">📢</span>
+            <h2 class="text-[17px] font-bold text-slate-800 tracking-tight">Thông báo</h2>
+        </div>
+        <a class="text-[14px] font-medium text-[#086a9f] hover:underline flex items-center gap-1 transition-colors" href="/ThongBao">
+            Xem tiếp <span class="text-base font-bold leading-none">›</span>
+        </a>
+    </div>
+    <div class="h-[1px] bg-[#dbe8f2] w-full"></div>
+
+    @if (noiBat.Count == 0 && tinKhac.Count == 0)
+    {
+        <p class="p-8 text-center text-sm text-on-surface-variant italic">Chưa có thông báo nào.</p>
+    }
+    else
+    {
+        <div class="p-5 grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+            <div class="lg:col-span-6 grid grid-cols-1 sm:grid-cols-2 gap-5">
+                @foreach (var tin in noiBat)
+                {
+                    <a class="flex flex-col group" href="/ThongBao/Details/@tin.MaThongBao">
+                        <div class="w-full aspect-[16/10] bg-[#4ba3e3] rounded-xl overflow-hidden relative shadow-sm flex items-center justify-center p-3 mb-2.5">
+                            @if (string.IsNullOrEmpty(tin.AnhDaiDien))
+                            {
+                                <svg class="w-4/5 h-4/5 drop-shadow-sm transition-transform duration-200 group-hover:scale-105" viewBox="0 0 200 150" aria-hidden="true">
+                                    <polygon fill="#378ac7" opacity="0.4" points="80,75 185,130 135,150 70,85"></polygon>
+                                    <path d="M40 70 L75 55 L75 95 L40 80 Z" fill="#2c3e50"></path>
+                                    <path d="M75 55 L145 25 L145 125 L75 95 Z" fill="#ffffff"></path>
+                                    <path d="M75 67 L115 50 L115 100 L75 83 Z" fill="#ff5722"></path>
+                                    <ellipse cx="145" cy="75" fill="#e0e0e0" rx="9" ry="50"></ellipse>
+                                    <ellipse cx="145" cy="75" fill="#f5f5f5" rx="5" ry="46"></ellipse>
+                                    <path d="M50 78 Q42 110 58 120 Q66 115 62 82 Z" fill="#ff5722"></path>
+                                    <path d="M58 85 L65 112" stroke="#2c3e50" stroke-linecap="round" stroke-width="4"></path>
+                                    <line stroke="#ffffff" stroke-linecap="round" stroke-width="3.5" x1="162" x2="185" y1="52" y2="35"></line>
+                                    <line stroke="#ffffff" stroke-linecap="round" stroke-width="3.5" x1="168" x2="195" y1="75" y2="75"></line>
+                                    <line stroke="#ffffff" stroke-linecap="round" stroke-width="3.5" x1="162" x2="185" y1="98" y2="115"></line>
+                                </svg>
+                            }
+                            else
+                            {
+                                <img src="@tin.AnhDaiDien" alt="" class="w-full h-full object-cover transition-transform duration-200 group-hover:scale-105" />
+                            }
+                        </div>
+                        <div class="flex justify-end mb-1">
+                            <span class="text-[12px] text-slate-500 font-medium">@tin.NgayDang.ToString("dd/MM/yyyy")</span>
+                        </div>
+                        <h3 class="text-[13px] font-bold text-slate-800 leading-snug group-hover:text-[#086a9f] transition-colors">
+                            @if (tin.LaMoi)
+                            {
+                                <span class="inline-block bg-[#8e24aa] text-white text-[10px] font-bold px-1.5 py-0.5 rounded mr-1 align-baseline tracking-normal uppercase">Mới</span>
+                            }
+                            @tin.TieuDe
+                        </h3>
+                    </a>
+                }
+            </div>
+
+            <div class="lg:col-span-6 flex flex-col divide-y divide-slate-100">
+                @foreach (var tin in tinKhac)
+                {
+                    <a class="py-2.5 flex items-baseline justify-between gap-4 group hover:bg-slate-50/70 px-2 rounded transition-colors" href="/ThongBao/Details/@tin.MaThongBao">
+                        <span class="flex items-start gap-1.5 flex-1">
+                            <span class="text-[#086a9f] font-bold text-sm select-none leading-tight mt-0.5">»</span>
+                            <span class="text-[13px] @(tin.LaMoi ? "font-bold" : "font-normal") text-slate-800 group-hover:text-[#086a9f] transition-colors leading-snug">
+                                @if (tin.LaMoi)
+                                {
+                                    <span class="inline-block bg-[#8e24aa] text-white text-[10px] font-bold px-1.5 py-0.5 rounded mr-1 align-baseline uppercase">Mới</span>
+                                }
+                                @tin.TieuDe
+                            </span>
+                        </span>
+                        <span class="text-[12px] text-slate-500 whitespace-nowrap shrink-0">@tin.NgayDang.ToString("dd/MM/yyyy")</span>
+                    </a>
+                }
+            </div>
+        </div>
+    }
+</section>

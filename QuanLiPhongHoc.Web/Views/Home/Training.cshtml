@@ -1,0 +1,124 @@
+@using QuanLiPhongHoc.Web.Services
+@using QuanLiPhongHoc.Web.Models.ViewModels
+@{
+    ViewData["Title"] = "Bảng tin Đào tạo";
+    var kpi = ViewBag.Kpi as DashboardKpiDto;
+    var thongBao = ViewBag.ThongBao as ThongBaoHomeVm;
+    var pending = kpi?.DonNghiCho ?? 0;
+    var today = DateTime.Today;
+    var dayOfWeek = today.DayOfWeek switch
+    {
+        DayOfWeek.Monday => "Thứ Hai",
+        DayOfWeek.Tuesday => "Thứ Ba",
+        DayOfWeek.Wednesday => "Thứ Tư",
+        DayOfWeek.Thursday => "Thứ Năm",
+        DayOfWeek.Friday => "Thứ Sáu",
+        DayOfWeek.Saturday => "Thứ Bảy",
+        DayOfWeek.Sunday => "Chủ Nhật",
+        _ => ""
+    };
+}
+
+<!-- Welcome / breadcrumb strip -->
+<section class="bg-surface-container-lowest px-5 py-3 rounded-xl shadow-sm border border-surface-container flex flex-col md:flex-row md:items-center justify-between gap-3 mb-4">
+    <div class="flex flex-col gap-0.5">
+        <div class="flex items-center gap-1.5 text-body-sm text-on-surface-variant">
+            <a href="/Home" class="hover:text-primary">Trang chủ</a>
+            <span class="text-outline-variant">&gt;</span>
+            <span class="text-primary font-semibold">Bảng tin &amp; Chỉ đạo Đào tạo &amp; Giảng đường</span>
+        </div>
+        <div class="flex flex-wrap items-center gap-2 mt-0.5">
+            <span class="w-2 h-2 rounded-full bg-tertiary"></span>
+            <span class="font-headline-sm text-headline-sm text-on-surface">Xin chào, @((string?)ViewBag.HoTen ?? User.Identity?.Name)!</span>
+            <span class="text-outline-variant">•</span>
+            <span class="font-label-md text-label-md text-secondary">Ban Quản lý Đào tạo - P. Đào tạo TDMU</span>
+        </div>
+    </div>
+    <div class="flex items-center gap-2 shrink-0">
+        <div class="px-3 py-1.5 rounded-lg bg-surface-container-low text-primary font-label-md text-label-md flex items-center gap-1.5 border border-surface-container">
+            <span class="material-symbols-outlined text-[18px]">event_available</span>
+            <span>@dayOfWeek, @today.ToString("dd/MM/yyyy") • Học kỳ 1</span>
+        </div>
+    </div>
+</section>
+
+<!-- Announcements -->
+<partial name="_ThongBaoBlock" model="thongBao" />
+
+<!-- Main functions -->
+<section class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-2">
+    <div class="bg-surface-container-lowest p-4 rounded-xl shadow-sm border border-surface-container hover:shadow-md transition-all flex flex-col justify-between gap-3">
+        <div class="flex flex-col gap-2">
+            <div class="flex items-center justify-between">
+                <div class="w-12 h-12 rounded-xl bg-surface-container text-primary flex items-center justify-center">
+                    <span class="material-symbols-outlined text-[28px]">calendar_month</span>
+                </div>
+                <span class="px-2 py-0.5 rounded-full bg-surface-container text-primary font-label-sm text-label-sm font-semibold">
+                    @(kpi?.PhongSanSang ?? 0)/@(kpi?.TongPhong ?? 0) phòng
+                </span>
+            </div>
+            <h4 class="font-headline-sm text-headline-sm text-on-surface font-bold">Quản lý thời khóa biểu</h4>
+            <p class="font-body-sm text-body-sm text-on-surface-variant">
+                Tra cứu ma trận TKB, xếp phòng bù tự động và rà soát trùng lịch @(kpi?.TongPhong ?? 0) phòng học toàn trường theo thời gian thực.
+            </p>
+        </div>
+        <div class="pt-2 border-t border-surface-container flex items-center justify-between">
+            <a href="/LichHoc" class="font-label-md text-label-md text-primary hover:underline flex items-center gap-1 font-semibold">
+                <span>Xem ma trận &amp; Xếp bù</span>
+                <span class="material-symbols-outlined text-[16px]">arrow_forward</span>
+            </a>
+            <span class="font-label-sm text-label-sm text-on-surface-variant">Phòng học</span>
+        </div>
+    </div>
+
+    <div class="bg-surface-container-lowest p-4 rounded-xl shadow-sm border border-surface-container hover:shadow-md transition-all flex flex-col justify-between gap-3">
+        <div class="flex flex-col gap-2">
+            <div class="flex items-center justify-between">
+                <div class="w-12 h-12 rounded-xl bg-secondary-fixed text-on-secondary-fixed flex items-center justify-center">
+                    <span class="material-symbols-outlined text-[28px]">assignment_turned_in</span>
+                </div>
+                @if (pending > 0)
+                {
+                    <span class="px-2.5 py-0.5 rounded-full bg-error-container text-on-error-container font-label-sm text-label-sm font-bold">@pending đơn mới</span>
+                }
+                else
+                {
+                    <span class="px-2.5 py-0.5 rounded-full bg-surface-container text-secondary font-label-sm text-label-sm font-semibold">Đã xử lý hết</span>
+                }
+            </div>
+            <h4 class="font-headline-sm text-headline-sm text-on-surface font-bold">Phê duyệt đơn báo nghỉ</h4>
+            <p class="font-body-sm text-body-sm text-on-surface-variant">
+                Xem xét, duyệt hoặc từ chối phiếu xin nghỉ, xếp bù giảng đường của GV và bố trí cử giảng viên dạy thay kịp thời.
+            </p>
+        </div>
+        <div class="pt-2 border-t border-surface-container flex items-center justify-between">
+            <a href="/DonXinNghi" class="font-label-md text-label-md text-error hover:underline flex items-center gap-1 font-semibold">
+                <span>Đi đến danh sách chờ</span>
+                <span class="material-symbols-outlined text-[16px]">arrow_forward</span>
+            </a>
+            <span class="px-2 py-0.5 rounded bg-error/10 text-error font-label-sm text-label-sm font-semibold">Ưu tiên xử lý</span>
+        </div>
+    </div>
+
+    <div class="bg-surface-container-lowest p-4 rounded-xl shadow-sm border border-surface-container hover:shadow-md transition-all flex flex-col justify-between gap-3">
+        <div class="flex flex-col gap-2">
+            <div class="flex items-center justify-between">
+                <div class="w-12 h-12 rounded-xl bg-[#c7e7fa] text-primary flex items-center justify-center">
+                    <span class="material-symbols-outlined text-[28px]">upload_file</span>
+                </div>
+                <span class="px-2 py-0.5 rounded-full bg-surface-container text-secondary font-label-sm text-label-sm font-semibold">HK1 2026-2027</span>
+            </div>
+            <h4 class="font-headline-sm text-headline-sm text-on-surface font-bold">Danh mục học phần</h4>
+            <p class="font-body-sm text-body-sm text-on-surface-variant">
+                Xem và quản lý danh sách lớp học phần; sau khi nhập Excel, hệ thống đưa bạn về danh mục để rà soát dữ liệu.
+            </p>
+        </div>
+        <div class="pt-2 border-t border-surface-container flex items-center justify-between">
+            <a href="/HocPhan" class="font-label-md text-label-md text-primary hover:underline flex items-center gap-1 font-semibold">
+                <span>Mở danh mục</span>
+                <span class="material-symbols-outlined text-[16px]">arrow_forward</span>
+            </a>
+            <a href="/HocPhan/Import" class="font-label-sm text-label-sm text-primary hover:underline">Nhập Excel</a>
+        </div>
+    </div>
+</section>

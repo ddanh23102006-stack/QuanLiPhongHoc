@@ -1,0 +1,19 @@
+# Bản dựng — machine-specific, luôn sinh lại được bằng `dotnet build`
+[Bb]in/
+[Oo]bj/
+
+# Cấu hình cục bộ của Visual Studio / VS Code / Rider
+.vs/
+.vscode/
+*.user
+*.suo
+
+# Khóa DataProtection mã hóa theo DPAPI của từng máy + tài khoản Windows.
+# Chép sang máy khác làm cookie đăng nhập và antiforgery giải mã lỗi.
+App_Data/
+
+# Ảnh người dùng tải lên qua màn hình quản trị thông báo
+wwwroot/uploads/
+
+# Secret cục bộ (`dotnet user-secrets`), không được commit
+secrets.json

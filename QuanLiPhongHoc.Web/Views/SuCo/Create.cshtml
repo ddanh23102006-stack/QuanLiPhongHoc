@@ -1,0 +1,433 @@
+@model SuCoFormVm
+@using System.Text.Json
+@{
+    ViewData["Title"] = "Báo sự cố";
+    var phongLoai = ViewBag.PhongLoai as Dictionary<int, string?> ?? new();
+    var phongs = ViewBag.PhongsFull as List<PhongHoc> ?? new();
+    var dsToa = ViewBag.DanhSachToa as List<ToaNha> ?? new();
+    var jsonPhongLoai = JsonSerializer.Serialize(phongLoai);
+    var jsonSuCoNhom = JsonSerializer.Serialize(Catalogs.SuCoTheoLoaiPhong);
+    var maPhongThietBi = ViewBag.MaPhongThietBi as int?;
+    var hoTen = ViewBag.HoTen as string ?? User.Identity?.Name;
+    var maNguoiDung = ViewBag.MaNguoiDung as string ?? "";
+    var mucDo = Model.MucDoNghiemTrong ?? "MEDIUM";
+    string oInput = "w-full rounded-lg border border-outline-variant/80 bg-surface-container-lowest px-3 py-2 text-sm text-on-surface focus:outline-none focus:ring-2 focus:ring-primary/25 focus:border-primary transition";
+}
+<div class="flex flex-wrap items-center justify-between gap-space-md mb-space-md">
+  <div>
+    <div class="text-xs text-on-surface-variant">CSVC / <a class="text-primary" href="/SuCo">Báo cáo sự cố</a> / <span class="font-bold">Gửi báo cáo</span></div>
+    <h1 class="text-xl font-bold text-primary">Báo cáo sự cố cơ sở vật chất</h1>
+    <p class="text-sm text-on-surface-variant mt-1">Cung cấp thông tin chi tiết để CSVC kiểm tra, xử lý và phản hồi ngay trong mục Báo cáo sự cố.</p>
+  </div>
+  <a class="px-3 py-2 rounded-lg bg-surface-container text-on-surface font-semibold text-sm" href="/SuCo">← Danh sách</a>
+</div>
+
+<form asp-action="Create" method="post" enctype="multipart/form-data" class="max-w-5xl space-y-4">
+  <div asp-validation-summary="ModelOnly" class="text-error text-sm"></div>
+
+  <!-- PHẦN 1: THÔNG TIN NGƯỜI BÁO CÁO & VỊ TRÍ SỰ CỐ -->
+  <section class="bg-surface-container-lowest rounded-xl border border-outline-variant/70 shadow-sm">
+    <div class="flex flex-wrap items-center justify-between gap-2 px-5 py-3.5 border-b border-outline-variant/60">
+      <h2 class="flex items-center gap-2.5 text-sm md:text-base font-bold text-primary">
+        <span class="w-7 h-7 rounded-md bg-primary text-on-primary flex items-center justify-center text-sm font-bold shrink-0">1</span>
+        Thông tin Người báo cáo &amp; Vị trí sự cố
+      </h2>
+      <span class="text-xs italic text-on-surface-variant">* Thông tin bắt buộc</span>
+    </div>
+
+    <div class="p-5 space-y-4">
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div>
+          <label class="block text-xs font-semibold text-on-surface-variant mb-1.5">Đối tượng báo cáo</label>
+          <div class="flex w-full rounded-lg bg-surface-container p-1">
+            <label class="flex-1 cursor-pointer">
+              <input type="radio" name="DoiTuongBaoCao" value="SINH_VIEN" class="peer sr-only"
+                     checked="@(Model.DoiTuongBaoCao != "GIANG_VIEN")" />
+              <span class="block text-center rounded-md px-3 py-1.5 text-sm font-semibold text-on-surface-variant transition
+                           peer-checked:bg-surface-container-lowest peer-checked:text-primary peer-checked:shadow-sm">Sinh viên</span>
+            </label>
+            <label class="flex-1 cursor-pointer">
+              <input type="radio" name="DoiTuongBaoCao" value="GIANG_VIEN" class="peer sr-only"
+                     checked="@(Model.DoiTuongBaoCao == "GIANG_VIEN")" />
+              <span class="block text-center rounded-md px-3 py-1.5 text-sm font-semibold text-on-surface-variant transition
+                           peer-checked:bg-surface-container-lowest peer-checked:text-primary peer-checked:shadow-sm">Giảng viên</span>
+            </label>
+          </div>
+          <span asp-validation-for="DoiTuongBaoCao" class="block text-error text-xs mt-1"></span>
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold text-on-surface-variant mb-1.5">Họ và tên <span class="text-error">*</span></label>
+          <div class="relative">
+            <input asp-for="HoTenNguoiBaoCao" value="@(Model.HoTenNguoiBaoCao ?? hoTen)" class="@oInput pr-9" placeholder="Họ tên người báo cáo" />
+            <span class="material-symbols-outlined absolute right-2.5 top-1/2 -translate-y-1/2 text-[18px] text-outline">person_edit</span>
+          </div>
+          <span asp-validation-for="HoTenNguoiBaoCao" class="block text-error text-xs mt-1"></span>
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold text-on-surface-variant mb-1.5">Mã số SV / Giảng viên <span class="text-error">*</span></label>
+          <div class="relative">
+            <input value="@maNguoiDung" readonly class="@oInput pr-9 bg-surface-container-low cursor-not-allowed" />
+            <span class="material-symbols-outlined absolute right-2.5 top-1/2 -translate-y-1/2 text-[18px] text-outline">badge</span>
+          </div>
+          <span class="block text-[11px] text-on-surface-variant mt-1">Lấy theo tài khoản đang đăng nhập.</span>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div>
+          <label class="block text-xs font-semibold text-on-surface-variant mb-1.5">Số điện thoại liên hệ <span class="text-error">*</span></label>
+          <div class="relative">
+            <input asp-for="SoDienThoaiLienHe" class="@oInput pr-9" placeholder="VD: 0918 234 567" inputmode="tel" />
+            <span class="material-symbols-outlined absolute right-2.5 top-1/2 -translate-y-1/2 text-[18px] text-outline">call</span>
+          </div>
+          <span asp-validation-for="SoDienThoaiLienHe" class="block text-error text-xs mt-1"></span>
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold text-on-surface-variant mb-1.5">Tòa nhà</label>
+          <div class="relative">
+            <select id="LocToaNha" class="@oInput appearance-none pr-9">
+              <option value="">Tất cả tòa nhà</option>
+              @foreach (var t in dsToa)
+              {
+                <option value="@t.MaToaNha">@t.CodeToaNha — @t.TenToaNha</option>
+              }
+            </select>
+            <span class="material-symbols-outlined absolute right-2.5 top-1/2 -translate-y-1/2 text-[18px] text-outline pointer-events-none">apartment</span>
+          </div>
+          <span class="block text-[11px] text-on-surface-variant mt-1">Chọn tòa để lục phòng nhanh hơn.</span>
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold text-on-surface-variant mb-1.5">Loại phòng học</label>
+          <div class="relative">
+            <select id="LocLoaiPhong" class="@oInput appearance-none pr-9">
+              <option value="">Tất cả loại phòng</option>
+              @foreach (var kv in Catalogs.LoaiPhong)
+              {
+                <option value="@kv.Key">@kv.Value</option>
+              }
+            </select>
+            <span class="material-symbols-outlined absolute right-2.5 top-1/2 -translate-y-1/2 text-[18px] text-outline pointer-events-none">expand_more</span>
+          </div>
+          <span class="block text-[11px] text-on-surface-variant mt-1">Kết hợp với tòa nhà để thu hẹp danh sách phòng.</span>
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold text-on-surface-variant mb-1.5">Mã phòng học <span class="text-error">*</span></label>
+          <div class="relative">
+            <select asp-for="MaPhong" id="MaPhong" class="@oInput appearance-none pr-9">
+              <option value="">— Chọn phòng gặp sự cố —</option>
+              @foreach (var p in phongs)
+              {
+                <option value="@p.MaPhong" data-loai="@p.LoaiPhong" data-toa="@p.MaToaNha" selected="@(Model.MaPhong == p.MaPhong)">
+                  @p.CodePhong@(p.ToaNha != null ? $" · {p.ToaNha.CodeToaNha}" : "")
+                </option>
+              }
+            </select>
+            <span class="material-symbols-outlined absolute right-2.5 top-1/2 -translate-y-1/2 text-[18px] text-outline pointer-events-none">meeting_room</span>
+          </div>
+          <span id="demPhong" class="block text-[11px] text-on-surface-variant mt-1"></span>
+          <span asp-validation-for="MaPhong" class="block text-error text-xs mt-1"></span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- PHẦN 2: MÔ TẢ SỰ CỐ & MỨC ĐỘ ẢNH HƯỞNG -->
+  <section class="bg-surface-container-lowest rounded-xl border border-outline-variant/70 shadow-sm">
+    <div class="flex flex-wrap items-center justify-between gap-2 px-5 py-3.5 border-b border-outline-variant/60">
+      <h2 class="flex items-center gap-2.5 text-sm md:text-base font-bold text-primary">
+        <span class="w-7 h-7 rounded-md bg-primary text-on-primary flex items-center justify-center text-sm font-bold shrink-0">2</span>
+        Mô tả sự cố &amp; Mức độ ảnh hưởng
+      </h2>
+      <span class="text-xs text-on-surface-variant">Ghi trực tiếp nội dung chi tiết</span>
+    </div>
+
+    <div class="p-5 space-y-5">
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div>
+          <label class="block text-xs font-semibold text-on-surface-variant mb-1.5">Loại sự cố <span class="text-error">*</span></label>
+          <select asp-for="LoaiSuCo" id="LoaiSuCo" class="@oInput">
+            <option value="">-- Chọn loại sự cố --</option>
+            @foreach (var item in Catalogs.LoaiSuCo)
+            {
+              <option value="@item.Key">@item.Value</option>
+            }
+          </select>
+          <span class="block text-[11px] text-on-surface-variant mt-1">Danh sách được lọc theo loại phòng; chọn "Cơ sở vật chất khác" nếu không có mục phù hợp.</span>
+          <span asp-validation-for="LoaiSuCo" class="block text-error text-xs mt-1"></span>
+        </div>
+        <div>
+          <label class="block text-xs font-semibold text-on-surface-variant mb-1.5">Thiết bị trong phòng</label>
+          <select asp-for="MaPhongThietBi" id="MaPhongThietBi" class="@oInput">
+            <option value="">-- Không chọn --</option>
+          </select>
+          <span id="goiYThietBi" class="block text-[11px] text-on-surface-variant mt-1">Chọn phòng và loại sự cố để lọc thiết bị phù hợp.</span>
+        </div>
+      </div>
+
+      <div>
+        <label class="block text-xs font-semibold text-on-surface-variant mb-1.5">Mô tả danh mục lỗi gặp phải <span class="text-error">*</span></label>
+        <textarea asp-for="MoTa" rows="3" class="@oInput resize-y"
+                  placeholder="VD: Hỏng máy chiếu, không lên hình và quạt kêu to"></textarea>
+        <span class="block text-[11px] text-on-surface-variant mt-1">Nhập vấn đề thực tế thiết bị gặp sự cố để kỹ thuật viên chuẩn bị dụng cụ thay thế phù hợp.</span>
+        <span asp-validation-for="MoTa" class="block text-error text-xs mt-1"></span>
+      </div>
+
+      <div>
+        <label class="block text-xs font-semibold text-on-surface-variant mb-1.5">Mức độ ảnh hưởng đến việc giảng dạy / học tập <span class="text-error">*</span></label>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-3" id="nhomMucDo">
+          <label data-muc-do="MEDIUM" class="cursor-pointer rounded-lg border-2 px-3.5 py-3 flex items-start gap-2.5 transition">
+            <input type="radio" name="MucDoNghiemTrong" value="MEDIUM" class="peer sr-only" checked="@(mucDo == "MEDIUM")" />
+            <span class="mt-0.5 w-4 h-4 rounded-full border-2 border-outline shrink-0 flex items-center justify-center transition">
+              <span class="w-2 h-2 rounded-full bg-current opacity-0"></span>
+            </span>
+            <span>
+              <span class="flex items-center gap-1.5 text-sm font-semibold text-on-surface">
+                <span class="w-2 h-2 rounded-full bg-tertiary"></span> Bình thường
+              </span>
+              <span class="block text-[11px] text-on-surface-variant mt-0.5">Vẫn tiếp tục dạy học được, xử lý sau giờ</span>
+            </span>
+          </label>
+
+          <label data-muc-do="HIGH" class="cursor-pointer rounded-lg border-2 px-3.5 py-3 flex items-start gap-2.5 transition">
+            <input type="radio" name="MucDoNghiemTrong" value="HIGH" class="peer sr-only" checked="@(mucDo == "HIGH")" />
+            <span class="mt-0.5 w-4 h-4 rounded-full border-2 border-outline shrink-0 flex items-center justify-center transition">
+              <span class="w-2 h-2 rounded-full bg-current opacity-0"></span>
+            </span>
+            <span>
+              <span class="flex items-center gap-1.5 text-sm font-semibold text-on-surface">
+                <span class="w-2 h-2 rounded-full bg-amber-500"></span> Cần xử lý sớm trong ngày
+              </span>
+              <span class="block text-[11px] text-on-surface-variant mt-0.5">Ảnh hưởng cục bộ, kỹ thuật ghé kiểm tra</span>
+            </span>
+          </label>
+
+          <label data-muc-do="CRITICAL" class="cursor-pointer rounded-lg border-2 px-3.5 py-3 flex items-start gap-2.5 transition">
+            <input type="radio" name="MucDoNghiemTrong" value="CRITICAL" class="peer sr-only" checked="@(mucDo == "CRITICAL")" />
+            <span class="mt-0.5 w-4 h-4 rounded-full border-2 border-outline shrink-0 flex items-center justify-center transition">
+              <span class="w-2 h-2 rounded-full bg-current opacity-0"></span>
+            </span>
+            <span>
+              <span class="flex items-center gap-1.5 text-sm font-semibold text-on-surface">
+                <span class="w-2 h-2 rounded-full bg-error"></span> Nghiêm trọng (Cần đổi phòng)
+              </span>
+              <span class="block text-[11px] text-on-surface-variant mt-0.5">Không thể tiếp tục tiết học - Đổi phòng gấp</span>
+            </span>
+          </label>
+        </div>
+        <span asp-validation-for="MucDoNghiemTrong" class="block text-error text-xs mt-1"></span>
+        <p class="text-[11px] text-on-surface-variant mt-1.5">Mức "Nghiêm trọng" sẽ tự đưa phòng vào bảo trì và chuyển thiết bị được chọn sang trạng thái hỏng.</p>
+      </div>
+
+      <div>
+        <label class="block text-xs font-semibold text-on-surface-variant mb-1.5">Nội dung góp ý / Đề xuất đổi phòng học nếu cần</label>
+        <textarea asp-for="NoiDungGopY" rows="3" class="@oInput resize-y"
+                  placeholder="VD: Lớp đang thuyết trình môn chuyên ngành (50 sinh viên), kinh đề xuất đổi phòng sang C.102 hoặc phòng trống lân cận nếu sửa mất nhiều thời gian."></textarea>
+        <span asp-validation-for="NoiDungGopY" class="block text-error text-xs mt-1"></span>
+      </div>
+
+      <div>
+        <label class="block text-xs font-semibold text-on-surface-variant mb-1.5">Đính kèm hình ảnh hiện trường sự cố (nếu có)</label>
+        <div class="rounded-lg border-2 border-dashed border-outline-variant/80 bg-surface-container-low/40 px-4 py-3">
+          <input type="file" asp-for="AnhDinhKem" id="AnhDinhKem" accept=".jpg,.jpeg,.png" class="hidden" />
+          <div class="flex flex-wrap items-center justify-between gap-3">
+            <label for="AnhDinhKem" class="flex items-center gap-2.5 cursor-pointer text-sm text-on-surface-variant">
+              <span class="w-9 h-9 rounded-lg bg-surface-container flex items-center justify-center text-primary shrink-0">
+                <span class="material-symbols-outlined text-[20px]">add_photo_alternate</span>
+              </span>
+              <span>
+                <span class="block font-semibold text-on-surface">Hỗ trợ JPG, PNG · dung lượng tối đa 10MB</span>
+                <span class="block text-[11px]">Ảnh giúp CSVC xác định đúng lỗi trước khi đến kiểm tra.</span>
+              </span>
+            </label>
+            <label for="AnhDinhKem" class="px-3 py-2 rounded-lg border border-primary text-primary font-semibold text-sm cursor-pointer hover:bg-primary/5 transition">Chọn ảnh khác</label>
+          </div>
+          <div id="tepHinhAnh" class="hidden mt-3 flex flex-wrap items-center gap-2 rounded-lg bg-surface-container px-3 py-2 text-sm">
+            <span class="material-symbols-outlined text-[18px] text-primary">image</span>
+            <span id="tenHinhAnh" class="font-medium truncate max-w-[60%]"></span>
+            <span id="dungLuongHinhAnh" class="text-xs text-on-surface-variant"></span>
+            <button type="button" id="xoaHinhAnh" class="ml-auto p-1 rounded hover:bg-error-container/40 text-error" title="Bỏ ảnh">
+              <span class="material-symbols-outlined text-[18px]">close</span>
+            </button>
+          </div>
+          <img id="xemTruocHinhAnh" alt="Ảnh xem trước" class="hidden mt-3 max-h-48 rounded-lg border border-outline-variant/70 object-contain" />
+          <span id="loiHinhAnh" class="hidden block text-error text-xs mt-1"></span>
+          <span asp-validation-for="AnhDinhKem" class="block text-error text-xs mt-1"></span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <div class="flex flex-wrap items-center gap-2">
+    <button type="submit" class="px-5 py-2.5 rounded-lg bg-primary-container text-on-primary font-semibold text-sm shadow-sm">Gửi báo cáo</button>
+    <a href="/SuCo" class="px-5 py-2.5 rounded-lg bg-surface-container text-on-surface font-semibold text-sm">Hủy</a>
+    <span class="text-xs text-on-surface-variant ml-auto">Báo cáo được gửi vào hộp thư CSVC; kết quả phản hồi sẽ hiện trong mục Báo cáo sự cố.</span>
+  </div>
+</form>
+
+@section Scripts {
+<script>
+  (() => {
+    const phongLoai = @Html.Raw(jsonPhongLoai);
+    const suCoNhom = @Html.Raw(jsonSuCoNhom);
+    const thietBiDangChon = @(maPhongThietBi?.ToString() ?? "null");
+
+    const selToa = document.getElementById('LocToaNha');
+    const selLoaiPhong = document.getElementById('LocLoaiPhong');
+    const selPhong = document.getElementById('MaPhong');
+    const selLoai = document.getElementById('LoaiSuCo');
+    const demPhong = document.getElementById('demPhong');
+
+    // Chọn phòng bằng ô Mã phòng thì đồng bộ lại tòa nhà/loại phòng tương ứng,
+    // tránh việc bộ lọc hiển thị lệch với phòng đang chọn.
+    function dongBoTuPhong() {
+      const opt = selPhong.selectedOptions[0];
+      if (!opt || !opt.value) return;
+      if (opt.dataset.loai) selLoaiPhong.value = opt.dataset.loai;
+      if (opt.dataset.toa) selToa.value = opt.dataset.toa;
+    }
+
+    function locPhong() {
+      const loai = selLoaiPhong.value;
+      const toa = selToa.value;
+      let conHien = false;
+      let soPhong = 0;
+      for (const opt of selPhong.options) {
+        if (!opt.value) continue;
+        const khopLoai = !loai || opt.dataset.loai === loai;
+        const khopToa = !toa || opt.dataset.toa === toa;
+        opt.hidden = !(khopLoai && khopToa);
+        if (!opt.hidden) {
+          soPhong++;
+          if (opt.selected) conHien = true;
+        }
+      }
+      if (selPhong.value && !conHien) selPhong.value = '';
+      if (demPhong) {
+        const boLoc = [toa ? 'tòa nhà đã chọn' : null, loai ? 'loại phòng đã chọn' : null].filter(Boolean).join(' và ');
+        demPhong.textContent = boLoc ? `${soPhong} phòng khớp ${boLoc}.` : `${soPhong} phòng khả dụng.`;
+      }
+    }
+
+    function locLoaiSuCo() {
+      const loai = phongLoai[selPhong.value];
+      const choPhep = new Set(['SU_CO_KHAC']);
+      if (loai && suCoNhom[loai]) suCoNhom[loai].forEach(x => choPhep.add(x));
+
+      for (const opt of selLoai.options) {
+        if (!opt.value) continue;
+        opt.hidden = !choPhep.has(opt.value);
+      }
+      if (selLoai.selectedOptions[0]?.hidden) selLoai.value = 'SU_CO_KHAC';
+    }
+
+    async function loadTb() {
+      const id = selPhong.value;
+      const sel = document.getElementById('MaPhongThietBi');
+      const goiY = document.getElementById('goiYThietBi');
+      if (!id) {
+        sel.innerHTML = '<option value="">-- Không chọn --</option>';
+        if (goiY) goiY.textContent = 'Chọn phòng và loại sự cố để lọc thiết bị phù hợp.';
+        return;
+      }
+
+      const loai = selLoai.value;
+      const url = '/SuCo/ThietBiTheoPhong?maPhong=' + encodeURIComponent(id)
+        + (loai ? '&loaiSuCo=' + encodeURIComponent(loai) : '');
+      const r = await fetch(url);
+      const items = await r.json();
+
+      if (!items.length) {
+        sel.innerHTML = '<option value="">-- Không có thiết bị phù hợp --</option>';
+        if (goiY) goiY.textContent = 'Loại sự cố này không khớp thiết bị nào trong phòng — để trống nếu sự cố không gắn với thiết bị cụ thể.';
+        return;
+      }
+
+      sel.innerHTML = '<option value="">-- Không chọn --</option>'
+        + items.map(x => `<option value="${x.maPhongThietBi}">${x.label}</option>`).join('');
+      if (thietBiDangChon) sel.value = String(thietBiDangChon);
+      if (goiY) {
+        goiY.textContent = loai
+          ? `${items.length} thiết bị có thể gặp loại sự cố đã chọn.`
+          : 'Chọn đúng thiết bị hỏng để CSVC cập nhật tình trạng thiết bị đó.';
+      }
+    }
+
+    selToa.addEventListener('change', locPhong);
+    selLoaiPhong.addEventListener('change', locPhong);
+    selPhong.addEventListener('change', () => { dongBoTuPhong(); locLoaiSuCo(); loadTb(); });
+    selLoai.addEventListener('change', loadTb);
+
+    dongBoTuPhong();
+    locPhong();
+    locLoaiSuCo();
+    loadTb();
+
+    // Thẻ mức độ: tô viền/nền theo lựa chọn.
+    const nhomMucDo = document.getElementById('nhomMucDo');
+    const theMucDo = [...nhomMucDo.querySelectorAll('[data-muc-do]')];
+    function capNhatMucDo() {
+      for (const the of theMucDo) {
+        const chon = the.querySelector('input').checked;
+        const cham = the.querySelector('span > span');
+        the.classList.toggle('border-primary', chon);
+        the.classList.toggle('bg-primary-fixed/40', chon);
+        the.classList.toggle('ring-1', chon);
+        the.classList.toggle('ring-primary/30', chon);
+        the.classList.toggle('border-outline-variant/70', !chon);
+        if (cham) {
+          cham.classList.toggle('opacity-100', chon);
+          cham.classList.toggle('opacity-0', !chon);
+        }
+      }
+    }
+    nhomMucDo.querySelectorAll('input[type="radio"]').forEach(r => r.addEventListener('change', capNhatMucDo));
+    capNhatMucDo();
+
+    // Ảnh đính kèm: hiển thị tên, dung lượng và xem trước; chặn file quá 10MB.
+    const fileInput = document.getElementById('AnhDinhKem');
+    const tep = document.getElementById('tepHinhAnh');
+    const ten = document.getElementById('tenHinhAnh');
+    const dungLuong = document.getElementById('dungLuongHinhAnh');
+    const xemTruoc = document.getElementById('xemTruocHinhAnh');
+    const loi = document.getElementById('loiHinhAnh');
+    let urlXemTruoc = null;
+
+    function xoaAnh() {
+      fileInput.value = '';
+      tep.classList.add('hidden');
+      xemTruoc.classList.add('hidden');
+      xemTruoc.removeAttribute('src');
+      loi.classList.add('hidden');
+      if (urlXemTruoc) { URL.revokeObjectURL(urlXemTruoc); urlXemTruoc = null; }
+    }
+
+    fileInput.addEventListener('change', () => {
+      const f = fileInput.files && fileInput.files[0];
+      if (!f) return xoaAnh();
+
+      if (f.size > 10 * 1024 * 1024) {
+        xoaAnh();
+        loi.textContent = 'Ảnh vượt dung lượng tối đa 10 MB.';
+        loi.classList.remove('hidden');
+        return;
+      }
+
+      ten.textContent = f.name;
+      dungLuong.textContent = `(${(f.size / (1024 * 1024)).toFixed(2)} MB)`;
+      tep.classList.remove('hidden');
+      loi.classList.add('hidden');
+
+      if (urlXemTruoc) URL.revokeObjectURL(urlXemTruoc);
+      urlXemTruoc = URL.createObjectURL(f);
+      xemTruoc.src = urlXemTruoc;
+      xemTruoc.classList.remove('hidden');
+    });
+    document.getElementById('xoaHinhAnh').addEventListener('click', xoaAnh);
+  })();
+</script>
+}

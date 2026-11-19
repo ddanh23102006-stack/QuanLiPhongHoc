@@ -1,0 +1,24 @@
+@model NguoiDungFormVm
+@{ ViewData["Title"] = "Sửa người dùng"; }
+<h1 class="text-xl font-bold mb-space-md">Cập nhật @Model.MaNguoiDung</h1>
+<form asp-action="Edit" method="post" class="bg-surface-container-lowest p-space-lg rounded-xl max-w-xl space-y-3 shadow-sm">
+  <div asp-validation-summary="All" class="text-error text-sm"></div>
+  <input type="hidden" asp-for="MaNguoiDung" />
+  <label class="block text-sm">Họ tên <input asp-for="HoTen" class="mt-1 w-full rounded-lg bg-surface-container-low px-3 py-2" /></label>
+  <label class="block text-sm">Email <input asp-for="Email" class="mt-1 w-full rounded-lg bg-surface-container-low px-3 py-2" /></label>
+  <label class="block text-sm">Mật khẩu mới (trống = giữ nguyên) <input asp-for="MatKhau" class="mt-1 w-full rounded-lg bg-surface-container-low px-3 py-2" /></label>
+  <div class="block text-sm">
+    <span>Vai trò (chọn ít nhất một)</span>
+    <div class="mt-1 grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+      @foreach (var role in (SelectList)ViewBag.VaiTros)
+      {
+        <label class="inline-flex items-center gap-2 rounded-lg bg-surface-container-low px-3 py-1.5">
+          <input type="checkbox" name="MaVaiTroIds" value="@role.Value" checked="@Model.MaVaiTroIds.Contains(int.Parse(role.Value))" />
+          @role.Text
+        </label>
+      }
+    </div>
+  </div>
+  <label class="inline-flex gap-2 text-sm"><input asp-for="BiKhoa" /> Khóa tài khoản</label>
+  <button class="block px-4 py-2 bg-primary-container text-on-primary rounded-lg font-semibold">Cập nhật</button>
+</form>

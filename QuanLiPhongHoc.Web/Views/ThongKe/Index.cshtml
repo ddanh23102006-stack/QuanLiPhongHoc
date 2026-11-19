@@ -1,0 +1,265 @@
+@model ThongKeDto
+@{
+    ViewData["Title"] = "Thống kê & báo cáo";
+    var from = (DateOnly)ViewBag.From;
+    var to = (DateOnly)ViewBag.To;
+    var topGv = Model.TopGiangVien.Take(5).ToList();
+    var maxGv = Model.TopGiangVien.FirstOrDefault()?.Value ?? 1;
+    var top = Model.TopGiangVien.FirstOrDefault();
+    var soNgay = to.DayNumber - from.DayNumber + 1;
+    var palette = new[] { "#00517c", "#446272", "#707880", "#92ccff", "#66df75" };
+    string RateBadge(DonViStatDto t)
+    {
+        if (t.SoCa == 0) return "bg-surface-container text-on-surface-variant";
+        return t.TyLeLapDay >= 80 ? "bg-error-container text-on-error-container"
+            : t.TyLeLapDay >= 50 ? "bg-[#fff3cd] text-[#8a5a00]"
+            : "bg-tertiary-container/15 text-tertiary";
+    }
+    string RateLabel(DonViStatDto t)
+    {
+        if (t.SoCa == 0) return "Chưa khai thác";
+        return t.TyLeLapDay >= 80 ? "Quá tải" : t.TyLeLapDay >= 50 ? "Cần cân tải" : "Chuẩn định mức";
+    }
+}
+
+<div class="flex flex-col gap-4">
+    <!-- Report header -->
+    <section class="flex flex-col lg:flex-row lg:items-start justify-between gap-3">
+        <div>
+            <div class="flex items-center gap-1.5 text-[11px] text-on-surface-variant uppercase tracking-wide">
+                <span>Ban Quản lý Đào tạo</span>
+                <span class="text-outline-variant">›</span>
+                <span class="text-primary font-semibold">Thống kê &amp; báo cáo hoạt động đào tạo</span>
+            </div>
+            <h1 class="font-headline-lg text-headline-lg font-bold text-on-surface uppercase mt-1">Thống kê &amp; báo cáo hiệu suất đào tạo &amp; giảng đường</h1>
+            <p class="font-body-sm text-body-sm text-on-surface-variant mt-1 max-w-3xl">
+                Hệ thống dữ liệu phân tích tải trọng giảng dạy, khối lượng thực hành và tình trạng xếp phòng học toàn trường.
+            </p>
+        </div>
+        <div class="flex items-center gap-2 shrink-0">
+            <div class="px-4 py-2 rounded-lg bg-surface-container border border-outline-variant">
+                <div class="text-[10px] text-on-surface-variant">Đồng bộ trực tiếp: <span class="font-semibold text-on-surface">Hôm nay</span></div>
+                <div class="font-mono font-bold text-primary text-sm">@DateTime.Now.ToString("HH:mm:ss")</div>
+            </div>
+            <a href="/ThongKe?from=@from.ToString("yyyy-MM-dd")&to=@to.ToString("yyyy-MM-dd")"
+               class="w-9 h-9 flex items-center justify-center rounded-lg border border-outline-variant bg-surface-container-lowest text-on-surface-variant hover:text-primary hover:border-primary" title="Làm mới dữ liệu">
+                <span class="material-symbols-outlined text-[20px]">refresh</span>
+            </a>
+        </div>
+    </section>
+
+    <!-- Filters -->
+    <form method="get" class="bg-surface-container-lowest border border-surface-container rounded-xl shadow-sm p-3 flex flex-col lg:flex-row lg:items-end gap-3">
+        <label class="block text-[10px] uppercase font-semibold text-on-surface-variant">
+            Loại báo cáo
+            <select name="loai" class="mt-0.5 block w-full lg:w-[240px] rounded-lg border border-outline-variant bg-surface-container-low px-2.5 py-2 text-xs text-on-surface">
+                <option>Báo cáo tổng hợp tải trọng</option>
+            </select>
+        </label>
+        <div class="block text-[10px] uppercase font-semibold text-on-surface-variant">
+            Khoảng thời gian nghiên cứu
+            <div class="mt-0.5 flex items-center gap-1.5">
+                <input type="date" name="from" value="@from.ToString("yyyy-MM-dd")"
+                       class="rounded-lg border border-outline-variant bg-surface-container-low px-2 py-2 text-xs" />
+                <span class="material-symbols-outlined text-[16px] text-on-surface-variant">arrow_forward</span>
+                <input type="date" name="to" value="@to.ToString("yyyy-MM-dd")"
+                       class="rounded-lg border border-outline-variant bg-surface-container-low px-2 py-2 text-xs" />
+            </div>
+        </div>
+        <div class="text-[11px] text-on-surface-variant lg:pb-2">
+            Đang xem <span class="font-semibold text-on-surface">@soNgay ngày</span>
+            <span class="block text-[10px]">@from.ToString("dd/MM/yyyy") – @to.ToString("dd/MM/yyyy")</span>
+        </div>
+        <div class="flex flex-wrap items-center gap-2 lg:ml-auto">
+            <button class="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-primary text-on-primary text-xs font-semibold hover:brightness-110">
+                <span class="material-symbols-outlined text-[16px]">filter_alt</span> Áp dụng lọc
+            </button>
+            <a href="/ThongKe/ExportExcel?from=@from.ToString("yyyy-MM-dd")&to=@to.ToString("yyyy-MM-dd")"
+               class="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-tertiary text-on-tertiary text-xs font-semibold hover:brightness-110">
+                <span class="material-symbols-outlined text-[16px]">table_view</span> Xuất Excel (.xlsx)
+            </a>
+            <button type="button" onclick="window.print()"
+                    class="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-error text-on-error text-xs font-semibold hover:brightness-110">
+                <span class="material-symbols-outlined text-[16px]">picture_as_pdf</span> Xuất PDF (.pdf)
+            </button>
+        </div>
+    </form>
+
+    <!-- KPI cards -->
+    <section class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3">
+        <div class="bg-surface-container-lowest border border-surface-container rounded-xl shadow-sm p-4 flex items-start justify-between gap-2">
+            <div class="min-w-0">
+                <div class="text-[10px] uppercase tracking-wide font-semibold text-on-surface-variant">Tổng tiết giảng thực tế</div>
+                <div class="font-headline-lg text-headline-lg font-bold text-on-surface mt-1">@Model.TongTiet <span class="text-sm font-semibold text-on-surface-variant">tiết</span></div>
+                <p class="text-[11px] text-on-surface-variant mt-1">Lý thuyết @Model.TietLyThuyet · Thực hành @Model.TietThucHanh</p>
+                <p class="text-[10px] text-on-surface-variant mt-0.5">@Model.SoCaLyThuyet ca lý thuyết · @Model.SoCaThucHanh ca thực hành</p>
+            </div>
+            <div class="w-10 h-10 rounded-lg bg-surface-container text-primary flex items-center justify-center shrink-0">
+                <span class="material-symbols-outlined text-[22px]">school</span>
+            </div>
+        </div>
+        <div class="bg-surface-container-lowest border border-surface-container rounded-xl shadow-sm p-4 flex items-start justify-between gap-2">
+            <div class="min-w-0">
+                <div class="text-[10px] uppercase tracking-wide font-semibold text-on-surface-variant">Tỷ lệ sử dụng phòng</div>
+                <div class="font-headline-lg text-headline-lg font-bold text-primary mt-1">@Model.TyLeSuDungPhong%</div>
+                <p class="text-[11px] text-on-surface-variant mt-1">@Model.SoPhongCoLich/@Model.TongPhong phòng có lịch</p>
+                <p class="text-[10px] text-on-surface-variant mt-0.5">@Model.TongLich ca trong kỳ báo cáo</p>
+            </div>
+            <div class="w-10 h-10 rounded-lg bg-tertiary-container/10 text-tertiary flex items-center justify-center shrink-0">
+                <span class="material-symbols-outlined text-[22px]">meeting_room</span>
+            </div>
+        </div>
+        <div class="bg-surface-container-lowest border border-surface-container rounded-xl shadow-sm p-4 flex items-start justify-between gap-2">
+            <div class="min-w-0">
+                <div class="text-[10px] uppercase tracking-wide font-semibold text-on-surface-variant">Học phần tải trọng lớn nhất</div>
+                <div class="font-headline-sm text-headline-sm font-bold text-on-surface mt-1 leading-snug">@Model.HocPhanLonNhat</div>
+                <p class="text-[11px] text-on-surface-variant mt-1">@Model.SiSoLonNhat sinh viên đăng ký</p>
+                <p class="text-[10px] text-on-surface-variant mt-0.5">Tổng @Model.TongHocPhan học phần toàn trường</p>
+            </div>
+            <div class="w-10 h-10 rounded-lg bg-surface-container text-primary flex items-center justify-center shrink-0">
+                <span class="material-symbols-outlined text-[22px]">class</span>
+            </div>
+        </div>
+        <div class="bg-surface-container-lowest border border-surface-container rounded-xl shadow-sm p-4 flex items-start justify-between gap-2">
+            <div class="min-w-0">
+                <div class="text-[10px] uppercase tracking-wide font-semibold text-on-surface-variant">Tỷ lệ ca thực hành</div>
+                <div class="font-headline-lg text-headline-lg font-bold text-on-surface mt-1">@Model.TyLeThucHanh%</div>
+                <p class="text-[11px] text-on-surface-variant mt-1">@Model.SoCaThucHanh/@(Model.SoCaLyThuyet + Model.SoCaThucHanh) ca thực hành</p>
+                <p class="text-[10px] text-on-surface-variant mt-0.5">@Model.PhongBaoTri phòng đang bảo trì</p>
+            </div>
+            <div class="w-10 h-10 rounded-lg bg-secondary-container text-primary flex items-center justify-center shrink-0">
+                <span class="material-symbols-outlined text-[22px]">science</span>
+            </div>
+        </div>
+    </section>
+
+    <!-- Teaching load allocation -->
+    <section class="bg-surface-container-lowest border border-surface-container rounded-xl shadow-sm p-4 md:p-5">
+        <div class="flex flex-wrap items-start justify-between gap-2 border-b border-surface-container pb-3 mb-4">
+            <div class="flex items-start gap-2">
+                <div class="w-9 h-9 rounded-lg bg-surface-container text-primary flex items-center justify-center shrink-0">
+                    <span class="material-symbols-outlined text-[20px]">donut_small</span>
+                </div>
+                <div>
+                    <h2 class="font-headline-sm text-headline-sm font-bold text-on-surface">Phân bổ tải trọng giảng dạy theo giảng viên</h2>
+                    <p class="text-[11px] text-on-surface-variant">Thống kê số ca giảng dạy thực tế trong kỳ báo cáo</p>
+                </div>
+            </div>
+            <span class="px-3 py-1 rounded-full bg-surface-container text-primary text-xs font-semibold">Tổng: @Model.TongLich ca</span>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-5">
+            <div class="lg:col-span-2 space-y-3">
+                @if (topGv.Count == 0)
+                {
+                    <p class="text-sm text-on-surface-variant py-6 text-center">Chưa có ca giảng dạy trong khoảng thời gian này.</p>
+                }
+                @foreach (var gv in topGv)
+                {
+                    var pct = Model.TongLich == 0 ? 0 : Math.Round(gv.Value * 100.0 / Model.TongLich, 1);
+                    var width = Math.Max(6, (int)Math.Round(gv.Value * 100.0 / maxGv));
+                    var color = palette[topGv.IndexOf(gv) % palette.Length];
+                    <div>
+                        <div class="flex items-center justify-between gap-2 text-xs">
+                            <span class="flex items-center gap-1.5 font-semibold text-on-surface">
+                                <span class="w-2 h-2 rounded-full" style="background:@color"></span>@gv.Label
+                            </span>
+                            <span class="text-on-surface-variant">@gv.Value ca (@pct%)</span>
+                        </div>
+                        <div class="mt-1 h-2.5 rounded-full bg-surface-container overflow-hidden">
+                            <div class="h-full rounded-full" style="width:@width%; background:@color"></div>
+                        </div>
+                    </div>
+                }
+            </div>
+
+            <aside class="rounded-xl bg-surface-container-low border border-outline-variant p-4">
+                <h3 class="flex items-center gap-1.5 font-headline-sm text-headline-sm font-bold text-primary">
+                    <span class="material-symbols-outlined text-[18px]">insights</span>
+                    Đánh giá hiệu suất tải trọng
+                </h3>
+                <p class="text-[11px] text-on-surface-variant leading-relaxed mt-2">
+                    @if (top is not null)
+                    {
+                        <span><b class="text-on-surface">@top.Label</b> dẫn đầu với <b class="text-on-surface">@top.Value ca</b> trong kỳ, chiếm @(Model.TongLich == 0 ? 0 : Math.Round(top.Value * 100.0 / Model.TongLich, 1))% tổng số ca toàn trường. </span>
+                    }
+                    Tỷ lệ sử dụng phòng đạt <b class="text-on-surface">@Model.TyLeSuDungPhong%</b> với @Model.SoPhongCoLich/@Model.TongPhong phòng có lịch.
+                </p>
+                <div class="text-[11px] font-bold text-on-surface mt-3">Khuyến nghị Ban Quản lý Đào tạo:</div>
+                <ul class="mt-1.5 space-y-1 text-[11px] text-on-surface-variant list-disc pl-4">
+                    @if (Model.TyLeThucHanh >= 50)
+                    {
+                        <li>Ưu tiên bổ sung phòng lab vì ca thực hành chiếm @Model.TyLeThucHanh% tổng ca.</li>
+                    }
+                    else
+                    {
+                        <li>Cân đối thêm ca thực hành cho các học phần kỹ thuật (hiện @Model.TyLeThucHanh%).</li>
+                    }
+                    @if (top is not null)
+                    {
+                        <li>Điều phối tải giảng dạy cho @top.Label để tránh dồn ca vào một giảng viên.</li>
+                    }
+                    @if (Model.PhongBaoTri > 0)
+                    {
+                        <li>Hoàn tất bảo trì @Model.PhongBaoTri phòng để tăng nguồn cung phòng học.</li>
+                    }
+                    else
+                    {
+                        <li>Duy trì công tác bảo trì định kỳ, toàn bộ phòng đang ở trạng thái sẵn sàng.</li>
+                    }
+                </ul>
+            </aside>
+        </div>
+    </section>
+
+    <!-- Comparison table -->
+    <section class="bg-surface-container-lowest border border-surface-container rounded-xl shadow-sm overflow-hidden">
+        <div class="flex flex-wrap items-center justify-between gap-2 px-4 py-3 border-b border-surface-container">
+            <div>
+                <h2 class="font-headline-sm text-headline-sm font-bold text-on-surface">Bảng so sánh hiệu suất sử dụng phòng theo tòa nhà</h2>
+                <p class="text-[11px] text-on-surface-variant">Tổng hợp mức độ khai thác phòng học của từng tòa nhà trong kỳ báo cáo</p>
+            </div>
+            <a href="/ThongKe/ExportExcel?from=@from.ToString("yyyy-MM-dd")&to=@to.ToString("yyyy-MM-dd")"
+               class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-surface-container text-primary text-xs font-semibold hover:brightness-105">
+                <span class="material-symbols-outlined text-[16px]">download</span> Xuất dữ liệu đơn vị
+            </a>
+        </div>
+        <div class="overflow-x-auto">
+            <table class="w-full min-w-[820px] text-xs">
+                <thead class="bg-surface-container-low text-left text-on-surface-variant uppercase text-[10px] tracking-wide">
+                    <tr>
+                        <th class="px-4 py-2.5">Tòa nhà</th>
+                        <th class="px-3 py-2.5 text-center">Số phòng</th>
+                        <th class="px-3 py-2.5 text-center">Số ca trong kỳ</th>
+                        <th class="px-3 py-2.5 text-center">Phòng có lịch</th>
+                        <th class="px-3 py-2.5 text-center">Phòng sẵn sàng</th>
+                        <th class="px-3 py-2.5 text-center">Tỷ lệ lấp đầy</th>
+                        <th class="px-3 py-2.5 text-center">Đánh giá</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @if (Model.ToaNhaStats.Count == 0)
+                    {
+                        <tr><td colspan="7" class="px-4 py-6 text-center text-on-surface-variant">Chưa có dữ liệu tòa nhà.</td></tr>
+                    }
+                    @foreach (var t in Model.ToaNhaStats)
+                    {
+                        <tr class="border-t border-surface-container hover:bg-surface-container-low/50">
+                            <td class="px-4 py-2.5 font-bold text-on-surface">@t.Label</td>
+                            <td class="px-3 py-2.5 text-center">@t.SoPhong phòng</td>
+                            <td class="px-3 py-2.5 text-center">@t.SoCa ca</td>
+                            <td class="px-3 py-2.5 text-center">@t.SoPhongCoLich</td>
+                            <td class="px-3 py-2.5 text-center">@t.PhongSanSang</td>
+                            <td class="px-3 py-2.5 text-center font-semibold @(t.TyLeLapDay >= 80 ? "text-error" : t.TyLeLapDay >= 50 ? "text-[#8a5a00]" : "text-tertiary")">@t.TyLeLapDay%</td>
+                            <td class="px-3 py-2.5 text-center">
+                                <span class="inline-block px-2 py-0.5 rounded-full text-[10px] font-bold @RateBadge(t)">
+                                    @RateLabel(t) @(t.SoCa == 0 ? "" : $"· {t.TyLeLapDay}%")
+                                </span>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </section>
+</div>

@@ -1,0 +1,51 @@
+@model PhongHocFormVm
+@{ ViewData["Title"] = "Sửa phòng"; }
+<h1 class="text-xl font-bold mb-space-md">Cập nhật phòng @Model.CodePhong</h1>
+<form asp-action="Edit" method="post" class="bg-surface-container-lowest p-space-lg rounded-xl shadow-sm max-w-xl space-y-3">
+  <input type="hidden" asp-for="MaPhong" />
+  <label class="block text-sm">Mã phòng <input asp-for="CodePhong" class="mt-1 w-full rounded-lg bg-surface-container-low px-3 py-2" /></label>
+  <label class="block text-sm">Tòa nhà <select asp-for="MaToaNha" asp-items="ViewBag.ToaNhas" class="mt-1 w-full rounded-lg bg-surface-container-low px-3 py-2"></select></label>
+  <label class="block text-sm">Loại
+    <select asp-for="LoaiPhong" class="mt-1 w-full rounded-lg bg-surface-container-low px-3 py-2">
+      @foreach (var kv in Catalogs.LoaiPhong) { <option value="@kv.Key">@kv.Value</option> }
+    </select>
+  </label>
+  <label class="block text-sm">Sức chứa <input asp-for="SucChua" class="mt-1 w-full rounded-lg bg-surface-container-low px-3 py-2" /></label>
+  <label class="block text-sm">Trạng thái
+    <select asp-for="TrangThaiPhong" class="mt-1 w-full rounded-lg bg-surface-container-low px-3 py-2">
+      @foreach (var kv in Catalogs.TrangThaiPhong) { <option value="@kv.Key">@kv.Value</option> }
+    </select>
+  </label>
+
+  <div id="khungWrap">
+    <partial name="_KhungTrongForm" model="Model.KhungTrong" />
+  </div>
+
+  <label class="flex items-start gap-2.5 p-3 rounded-lg border border-surface-container bg-surface-container-low cursor-pointer">
+    <input asp-for="HienThiDangKyMuon" class="mt-0.5 w-4 h-4 rounded border-outline text-primary focus:ring-primary" />
+    <span>
+      <span class="block text-sm font-semibold">Đăng phòng lên trang đăng ký mượn</span>
+      <span class="block text-xs text-on-surface-variant mt-0.5">
+        Khi tích, giảng viên và sinh viên thấy phòng này để đăng ký mượn theo khung giờ trống bên trên.
+        Không tích, phòng bị ẩn hoàn toàn và không nhận phiếu mượn mới.
+      </span>
+    </span>
+  </label>
+
+  <button class="px-4 py-2 bg-primary-container text-on-primary rounded-lg font-semibold">Cập nhật</button>
+</form>
+
+@section Scripts {
+  <script>
+    (() => {
+      const cb = document.getElementById('HienThiDangKyMuon');
+      const wrap = document.getElementById('khungWrap');
+      const capNhat = () => {
+        wrap.classList.toggle('hidden', !cb.checked);
+        wrap.querySelectorAll('input').forEach(i => i.disabled = !cb.checked);
+      };
+      cb.addEventListener('change', capNhat);
+      capNhat();
+    })();
+  </script>
+}

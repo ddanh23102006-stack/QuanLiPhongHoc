@@ -1,0 +1,476 @@
+@using System.Security.Claims
+@using Microsoft.EntityFrameworkCore
+@inject QuanLiPhongHoc.Web.Services.IDashboardService DashboardService
+@inject QuanLiPhongHoc.Web.Repositories.IRepository<NguoiDung> UserRepo
+@inject QuanLiPhongHoc.Web.Data.QuanLiPhongHocContext Db
+@{
+    var path = $"{ViewContext.RouteData.Values["controller"]}/{ViewContext.RouteData.Values["action"]}";
+    string Nav(string href, string icon, string text, string? badge = null)
+    {
+        var parts = href.TrimStart('/').Split('/', 2);
+        var duongDaiHoc = path.Split('/')[0];
+        var active = string.Equals(duongDaiHoc, parts[0], StringComparison.OrdinalIgnoreCase)
+                     && (parts.Length == 1
+                         || string.Equals(path, $"{parts[0]}/{parts[1]}", StringComparison.OrdinalIgnoreCase));
+        var cls = active
+            ? "flex items-center gap-3 px-4 py-2.5 bg-surface-container text-primary font-semibold border-l-4 border-primary transition-all"
+            : "flex items-center gap-3 px-4 py-2.5 text-on-surface-variant font-medium border-l-4 border-transparent hover:bg-surface-container-low hover:text-on-surface transition-colors";
+        var b = string.IsNullOrEmpty(badge) ? "" : $"<span class=\"ml-auto px-1.5 py-0.5 rounded-full bg-error-container text-on-error-container font-label-sm font-bold\">{badge}</span>";
+        return $"<a class=\"{cls}\" href=\"{href}\"><span class=\"material-symbols-outlined text-[20px]\">{icon}</span><span class=\"font-label-md text-label-md\">{text}</span>{b}</a>";
+    }
+    var isAdmin = User.IsInRole(AppRoles.Admin);
+    var isFacility = User.IsInRole(AppRoles.Facility);
+    var isTraining = User.IsInRole(AppRoles.Training);
+    var isLecturer = User.IsInRole(AppRoles.Lecturer);
+    var roleLabel = isAdmin ? "Quản trị viên"
+        : User.IsInRole(AppRoles.Facility) ? "Nhân viên cơ sở vật chất"
+        : User.IsInRole(AppRoles.Training) ? "Nhân viên đào tạo"
+        : User.IsInRole(AppRoles.Lecturer) ? "Giảng viên" : "Sinh viên";
+    var pendingTraining = isTraining ? (await DashboardService.GetKpisAsync()).DonNghiCho : 0;
+    var pendingDatPhong = isFacility ? (await DashboardService.GetKpisAsync()).DonDatCho : 0;
+    var maTaiKhoan = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? "";
+    var coPhieuDaGui = !isAdmin && !isFacility && !isTraining;
+    var ketQuaChuaXem = coPhieuDaGui
+        ? await Db.DatPhongs.CountAsync(x => x.NguoiYeuCau == maTaiKhoan && x.ThoiDiemXuLy != null && !x.DaXemKetQua)
+        : 0;
+    var suCoChuaXem = coPhieuDaGui
+        ? await Db.SuCos.CountAsync(x => x.NguoiBaoCao == maTaiKhoan && !x.DaXemPhanHoi && x.ThongBaoPhanHoi != null)
+        : 0;
+    var suCoMoi = isFacility ? await Db.SuCos.CountAsync(x => x.TrangThai == "NEW") : 0;
+    var hoSo = await UserRepo.GetByIdAsync(maTaiKhoan);
+    // Hiển thị tên từ hồ sơ hiện tại thay vì claim trong cookie — claim có thể còn
+    // giá trị cũ hoặc bị lỗi mã hoá sau khi quản trị viên sửa họ tên.
+    var tenHienThi = hoSo?.HoTen ?? User.Identity?.Name ?? "U";
+    var chuCuoi = tenHienThi.Split(' ', StringSplitOptions.RemoveEmptyEntries).LastOrDefault() ?? "U";
+    var initials = chuCuoi[..Math.Min(2, chuCuoi.Length)].ToUpperInvariant();
+    var tenCuaMa = User.IsInRole(AppRoles.Student) ? "Mã sinh viên"
+        : User.IsInRole(AppRoles.Lecturer) ? "Mã giảng viên" : "Tài khoản";
+}
+<!DOCTYPE html>
+<html lang="vi" class="light">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>@ViewData["Title"] - TDMU Quản lý Phòng học</title>
+    <link rel="stylesheet" href="/lib/fonts/inter.css" />
+    <link rel="stylesheet" href="/lib/fonts/material-symbols-outlined.css" />
+    <script src="/lib/tailwind/tailwindcss.js"></script>
+    <script>
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              "on-tertiary-fixed-variant":"#00531a","on-tertiary-fixed":"#002106","on-secondary-fixed-variant":"#2c4b59",
+              "on-tertiary-container":"#83fc8e","secondary-container":"#c7e7fa","primary":"#00517c","on-secondary":"#ffffff",
+              "outline":"#707880","inverse-surface":"#1f333f","on-primary":"#ffffff","tertiary-fixed":"#83fc8e",
+              "tertiary-fixed-dim":"#66df75","on-tertiary":"#ffffff","surface":"#f5faff","inverse-on-surface":"#e4f3ff",
+              "surface-container-low":"#eaf5ff","surface-container-highest":"#d0e5f6","surface-container-lowest":"#ffffff",
+              "on-secondary-container":"#4a6878","secondary-fixed-dim":"#abcbdd","on-error-container":"#93000a",
+              "error":"#ba1a1a","on-background":"#081e29","inverse-primary":"#92ccff","on-primary-container":"#cce5ff",
+              "error-container":"#ffdad6","on-surface-variant":"#40484f","background":"#f5faff","on-secondary-fixed":"#001f2b",
+              "primary-fixed-dim":"#92ccff","surface-dim":"#c8dded","tertiary-container":"#007528","on-primary-fixed-variant":"#004b73",
+              "primary-fixed":"#cce5ff","on-surface":"#081e29","surface-tint":"#006497","surface-container":"#def0ff",
+              "primary-container":"#086a9f","surface-variant":"#d0e5f6","outline-variant":"#c0c7d0","on-error":"#ffffff",
+              "secondary":"#446272","surface-container-high":"#d6ebfb","on-primary-fixed":"#001e31","tertiary":"#005a1d",
+              "secondary-fixed":"#c7e7fa","surface-bright":"#f5faff"
+            },
+            borderRadius: { DEFAULT:"0.125rem", lg:"0.25rem", xl:"0.5rem", full:"0.75rem" },
+            spacing: { margin:"1rem", gutter:"1rem", "space-xl":"1.5rem", "space-sm":"0.5rem", "space-lg":"1rem", "space-xs":"0.25rem", "space-md":"0.75rem" },
+            fontFamily: {
+              sans:["Inter","Segoe UI","sans-serif"],
+              "headline-sm": ["Inter", "sans-serif"],
+              "label-md": ["Inter", "sans-serif"],
+              "label-sm": ["Inter", "sans-serif"]
+            },
+            fontSize: {
+              "label-sm": ["0.6875rem", { "lineHeight": "0.875rem", "letterSpacing": "0.02em", "fontWeight": "600" }],
+              "label-md": ["0.8125rem", { "lineHeight": "1rem", "fontWeight": "600" }],
+              "label-lg": ["0.875rem", { "lineHeight": "1.25rem", "fontWeight": "600" }],
+              "headline-sm": ["1rem", { "lineHeight": "1.375rem", "fontWeight": "600" }],
+              "headline-md": ["1.125rem", { "lineHeight": "1.5rem", "fontWeight": "600" }],
+              "headline-lg": ["1.375rem", { "lineHeight": "1.75rem", "letterSpacing": "-0.01em", "fontWeight": "700" }],
+              "body-sm": ["0.8125rem", { "lineHeight": "1.125rem", "fontWeight": "400" }],
+              "body-md": ["0.875rem", { "lineHeight": "1.25rem", "fontWeight": "400" }],
+              "body-lg": ["0.9375rem", { "lineHeight": "1.375rem", "fontWeight": "400" }]
+            }
+          }
+        }
+      }
+    </script>
+    <style>
+      .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 500, 'GRAD' 0, 'opsz' 20; }
+      body { font-family: Inter, sans-serif; }
+    </style>
+    <script src="/lib/chartjs/chart.umd.min.js"></script>
+    <script src="/js/gio-input.js" defer></script>
+</head>
+<body class="bg-background text-on-surface min-h-screen flex flex-col antialiased">
+<header class="fixed top-0 left-0 right-0 h-[50px] bg-primary-container z-50 shadow-[0_1px_8px_rgba(0,0,0,0.06)] px-3 sm:px-4 flex justify-between items-center gap-2 text-on-primary">
+  <div class="flex items-center gap-2 sm:gap-3 min-w-0">
+    <button id="sidebar-toggle" type="button" class="lg:hidden p-1.5 rounded-lg hover:bg-primary transition-colors shrink-0" aria-label="Mở menu">
+      <span class="material-symbols-outlined text-[22px]">menu</span>
+    </button>
+    <div class="w-8 h-8 rounded-full bg-surface-container-lowest p-0.5 shadow-sm flex items-center justify-center shrink-0">
+      <img src="/img/logo-tdmu.png" class="w-7 h-7 object-contain" alt="TDMU Logo" />
+    </div>
+    <div class="flex flex-col min-w-0">
+      <span class="font-headline-sm text-headline-sm text-on-primary font-bold tracking-tight leading-tight uppercase truncate">TRƯỜNG ĐẠI HỌC THỦ DẦU MỘT</span>
+      <span class="hidden sm:block font-label-sm text-label-sm text-on-primary-container leading-none opacity-90 uppercase truncate">@(isTraining ? "HỆ THỐNG QUẢN LÝ ĐÀO TẠO & PHÒNG HỌC" : "HỆ THỐNG QUẢN LÝ PHÒNG HỌC")</span>
+    </div>
+  </div>
+
+  <div class="flex items-center gap-1.5 sm:gap-3 shrink-0">
+    <a class="relative flex items-center gap-1.5 px-2 sm:px-2.5 py-1.5 text-on-primary-container hover:text-on-primary hover:bg-primary transition-colors rounded-lg text-xs font-medium" href="/ThongBao">
+      <span class="material-symbols-outlined text-[18px]">notifications</span>
+      <span class="hidden md:inline">Thông báo</span>
+      <span class="w-2 h-2 bg-error rounded-full ring-2 ring-primary-container ml-0.5"></span>
+    </a>
+    
+    <button class="flex items-center gap-1.5 px-2 sm:px-2.5 py-1.5 text-on-primary-container hover:text-on-primary hover:bg-primary transition-colors rounded-lg text-xs font-medium">
+      <span class="material-symbols-outlined text-[18px]">help_outline</span>
+      <span class="hidden md:inline">Trợ giúp</span>
+    </button>
+
+    <div class="hidden sm:block h-6 w-px bg-outline-variant opacity-40 mx-0.5"></div>
+
+    <div class="relative" id="tai-khoan">
+      <button type="button" id="tai-khoan-btn" aria-haspopup="true" aria-expanded="false" aria-controls="tai-khoan-menu"
+              class="flex items-center gap-2.5 pl-1 hover:bg-primary py-1 px-2 rounded-lg transition-colors">
+        <div class="w-8 h-8 rounded-full bg-surface-container-lowest text-primary-container font-headline-sm text-headline-sm flex items-center justify-center font-bold ring-1 ring-white/40 shrink-0">
+          @initials
+        </div>
+        <div class="hidden sm:flex flex-col text-left">
+          <div class="flex items-center gap-1.5 leading-tight">
+            <span class="font-label-md text-label-md text-on-primary font-bold">@tenHienThi</span>
+            <span class="text-[10px] text-on-primary-container/80">• @roleLabel</span>
+            <span id="tai-khoan-caret" class="material-symbols-outlined text-on-primary-container text-[16px] transition-transform duration-200">expand_more</span>
+          </div>
+          <span class="font-label-sm text-label-sm text-on-primary-container leading-none">Mã: @maTaiKhoan</span>
+        </div>
+      </button>
+
+      @* Panel đổi nội dung tại chỗ (tóm tắt <-> hồ sơ) thay vì điều hướng, để không rời trang đang làm. *@
+      <div id="tai-khoan-menu" role="dialog" aria-label="Thông tin tài khoản"
+           class="hidden absolute right-0 top-[calc(100%+6px)] w-[290px] bg-surface-container-lowest border border-outline-variant/70 rounded-xl shadow-[0_10px_34px_rgba(8,106,159,0.18)] overflow-hidden z-50">
+        <div class="flex items-center gap-2.5 px-3.5 py-3 bg-primary-container text-on-primary">
+          <div class="w-9 h-9 rounded-full bg-surface-container-lowest text-primary-container flex items-center justify-center font-bold ring-1 ring-white/40 shrink-0">@initials</div>
+          <div class="min-w-0 flex-1">
+            <div class="font-label-md text-label-md font-bold truncate">@(hoSo?.HoTen ?? User.Identity?.Name)</div>
+            <div class="font-label-sm text-label-sm opacity-90 truncate">@maTaiKhoan</div>
+          </div>
+          <a class="p-1 rounded-md hover:bg-primary transition-colors" href="/ThongBao" title="Thông báo">
+            <span class="material-symbols-outlined text-[18px]">notifications</span>
+          </a>
+          <button type="button" id="tai-khoan-close" class="p-1 rounded-md hover:bg-primary transition-colors" aria-label="Đóng">
+            <span class="material-symbols-outlined text-[18px]">expand_less</span>
+          </button>
+        </div>
+
+        <div class="py-1.5">
+          <div id="hoso-tom-tat">
+            <div class="flex items-start gap-2.5 px-3.5 py-2">
+              <span class="material-symbols-outlined text-[18px] text-on-surface-variant mt-px">badge</span>
+              <span class="text-[13px] text-on-surface-variant">Họ tên: <b class="text-on-surface font-semibold">@(hoSo?.HoTen ?? User.Identity?.Name)</b></span>
+            </div>
+            <div class="flex items-start gap-2.5 px-3.5 py-2">
+              <span class="material-symbols-outlined text-[18px] text-on-surface-variant mt-px">credit_card</span>
+              <span class="text-[13px] text-on-surface-variant">Tài khoản: <b class="text-on-surface font-semibold">@maTaiKhoan</b></span>
+            </div>
+            <div class="h-px bg-[#dbe8f2] my-1.5"></div>
+            <button type="button" id="hoso-open"
+                    class="w-full flex items-center gap-2.5 px-3.5 py-2.5 hover:bg-surface-container-low transition-colors text-left">
+              <span class="material-symbols-outlined text-[18px] text-primary">person</span>
+              <span class="flex-1 text-[13px] font-medium text-on-surface">Thông tin cá nhân</span>
+              <span class="material-symbols-outlined text-[16px] text-outline">chevron_right</span>
+            </button>
+            <button type="button" id="doimatkhau-open"
+                    class="w-full flex items-center gap-2.5 px-3.5 py-2.5 hover:bg-surface-container-low transition-colors text-left">
+              <span class="material-symbols-outlined text-[18px] text-primary">lock</span>
+              <span class="flex-1 text-[13px] font-medium text-on-surface">Đổi mật khẩu</span>
+            </button>
+          </div>
+
+          <div id="hoso-chi-tiet" class="hidden">
+            <button type="button" id="hoso-back"
+                    class="w-full flex items-center gap-2 px-3.5 py-2 hover:bg-surface-container-low transition-colors text-left">
+              <span class="material-symbols-outlined text-[16px] text-primary">arrow_back</span>
+              <span class="text-[12px] font-semibold text-primary uppercase tracking-wide">Quay lại</span>
+            </button>
+            <div class="h-px bg-[#dbe8f2] mb-1"></div>
+            <dl class="px-3.5 pb-2 space-y-2">
+              @foreach (var (nhan, giaTri) in new (string, string)[]
+              {
+                  ("Họ tên", hoSo?.HoTen ?? User.Identity?.Name ?? "—"),
+                  (tenCuaMa, maTaiKhoan),
+                  ("Số điện thoại", hoSo?.SoDienThoai ?? "—"),
+                  ("Ngày sinh", hoSo?.NgaySinh?.ToString("dd/MM/yyyy") ?? "—"),
+                  ("Giới tính", hoSo?.GioiTinh ?? "—"),
+                  ("Nơi sinh", hoSo?.NoiSinh ?? "—")
+              })
+              {
+                <div class="flex items-baseline justify-between gap-3">
+                  <dt class="text-[12px] text-on-surface-variant shrink-0">@nhan</dt>
+                  <dd class="text-[13px] font-semibold text-on-surface text-right">@giaTri</dd>
+                </div>
+              }
+            </dl>
+          </div>
+        </div>
+
+        <div class="h-px bg-[#dbe8f2]"></div>
+        <a class="flex items-center gap-2.5 px-3.5 py-2.5 hover:bg-error-container/50 transition-colors text-error" href="/Account/Logout">
+          <span class="material-symbols-outlined text-[18px]">logout</span>
+          <span class="text-[13px] font-semibold">Đăng xuất</span>
+        </a>
+      </div>
+    </div>
+  </div>
+</header>
+<div id="sidebar-backdrop" class="hidden lg:hidden fixed inset-0 top-[50px] bg-black/40 z-30"></div>
+<div class="flex-1 flex pt-[50px]">
+  <aside id="app-sidebar" class="fixed left-0 top-[50px] bottom-0 w-[240px] bg-surface-container-lowest z-40 flex flex-col justify-between border-r border-outline-variant shadow-[0_1px_8px_rgba(0,0,0,0.04)] py-3 -translate-x-full lg:translate-x-0 transition-transform duration-200 overflow-y-auto">
+    <div>
+      <div class="px-4 pb-3 mb-2 border-b border-outline-variant flex items-center gap-2">
+        @if (isTraining)
+        {
+          <h2 class="font-label-sm text-label-sm uppercase tracking-wider text-on-surface-variant font-semibold">Chức năng chính</h2>
+        }
+        else
+        {
+          <div class="w-7 h-7 rounded-lg bg-surface-container flex items-center justify-center text-primary shrink-0">
+            <span class="material-symbols-outlined text-[18px]">apps</span>
+          </div>
+          <div>
+            <h2 class="font-label-md text-label-md text-primary font-bold">Hệ thống Nghiệp vụ</h2>
+            <p class="font-label-sm text-label-sm text-on-surface-variant text-[11px]">Cổng thông tin @roleLabel</p>
+          </div>
+        }
+      </div>
+      <nav class="flex flex-col gap-1">
+        @Html.Raw(Nav("/Home", "grid_view", "Trang chủ"))
+        @if (isTraining)
+        {
+          @Html.Raw(Nav("/LichHoc", "calendar_month", "Quản lý thời khóa biểu"))
+          @Html.Raw(Nav("/HocPhan", "menu_book", "Danh mục học phần"))
+          @Html.Raw(Nav("/DonXinNghi", "fact_check", "Phê duyệt đơn báo nghỉ", pendingTraining > 0 ? pendingTraining.ToString() : null))
+          @Html.Raw(Nav("/ThongBao/Manage", "campaign", "Quản trị thông báo"))
+          @Html.Raw(Nav("/ThongKe", "bar_chart", "Thống kê & Báo cáo"))
+        }
+        else if (!isAdmin)
+        {
+          @if (!isFacility)
+          {
+            @Html.Raw(Nav("/LichHoc", "calendar_month", "Thời khóa biểu"))
+            @Html.Raw(Nav("/DatPhong/Create", "how_to_reg", "Đăng ký mượn phòng"))
+            @Html.Raw(Nav("/DatPhong/Index", "list_alt", "Phiếu đã gửi", ketQuaChuaXem > 0 ? ketQuaChuaXem.ToString() : null))
+          }
+          @if (!isFacility)
+          {
+            @Html.Raw(Nav("/SuCo", "report_problem", "Báo cáo sự cố CSVC", suCoChuaXem > 0 ? suCoChuaXem.ToString() : null))
+          }
+          @Html.Raw(Nav("/ThongBao", "notifications", "Xem thông báo"))
+          @if (isLecturer) { @Html.Raw(Nav("/DonXinNghi", "fact_check", "Đơn xin nghỉ & dạy bù")) }
+        }
+        @if (isFacility) {
+          @Html.Raw(Nav("/PhongHoc", "meeting_room", "Quản lý phòng học"))
+          @Html.Raw(Nav("/DatPhong/Index", "approval", "Duyệt đơn mượn phòng", pendingDatPhong > 0 ? pendingDatPhong.ToString() : null))
+          @Html.Raw(Nav("/SuCo", "report_problem", "Duyệt báo cáo sự cố", suCoMoi > 0 ? suCoMoi.ToString() : null))
+          @Html.Raw(Nav("/ToaNha", "apartment", "Tòa nhà"))
+          @Html.Raw(Nav("/ThietBi", "devices", "Thiết bị CSVC"))
+        }
+        @if (isAdmin) {
+          @Html.Raw(Nav("/NguoiDung", "group", "Tài khoản & phân quyền"))
+          @Html.Raw(Nav("/ThongBao/Manage", "campaign", "Theo dõi thông báo"))
+          @Html.Raw(Nav("/NhatKy", "list_alt", "Nhật ký hoạt động"))
+        }
+      </nav>
+    </div>
+    
+    <div class="px-4 pt-3 border-t border-outline-variant space-y-2">
+      <div class="flex items-start gap-2 bg-surface-container-low/40 p-2 rounded-lg">
+        <span class="material-symbols-outlined text-primary-container text-[18px] mt-0.5">support_agent</span>
+        <div class="flex-1">
+          <p class="font-label-sm text-label-sm font-bold text-on-surface leading-tight">Hỗ trợ kỹ thuật</p>
+          <p class="text-[10px] text-on-surface-variant leading-tight mt-0.5">Đường dây nóng: (0274) 382 2058</p>
+        </div>
+      </div>
+      @if (isTraining)
+      {
+        <div class="pt-2 mt-1 border-t border-outline-variant text-center">
+          <span class="font-label-sm text-label-sm text-on-surface-variant opacity-60 leading-tight">© Cổng thông tin Đào tạo TDMU</span>
+        </div>
+      }
+    </div>
+  </aside>
+  <div class="flex-1 min-w-0 ml-0 lg:ml-[240px] flex flex-col min-h-[calc(100vh-50px)]">
+    <main class="flex-1 w-full p-4 md:p-6 bg-background">
+      @if (TempData["Ok"] != null) {
+        <div class="mb-space-md px-space-md py-2.5 rounded-lg bg-tertiary-container/10 text-tertiary border border-tertiary/20">@TempData["Ok"]</div>
+      }
+      @if (TempData["Error"] != null) {
+        <div class="mb-space-md px-space-md py-2.5 rounded-lg bg-error-container text-on-error-container">@TempData["Error"]</div>
+      }
+      @RenderBody()
+    </main>
+    <footer class="px-4 md:px-6 py-3 text-xs text-on-surface-variant border-t border-surface-container flex flex-col sm:flex-row items-center justify-between gap-2">
+      <span>© 2026 Trường Đại học Thủ Dầu Một — Cổng Quản lý Phòng học. 06 Trần Văn Ơn, TP. Thủ Dầu Một.</span>
+      <span class="px-2.5 py-1 rounded-full bg-surface-container font-semibold text-primary shrink-0">Phiên bản Cổng thông tin v2.6.4</span>
+    </footer>
+  </div>
+</div>
+
+@* Hộp thoại đổi mật khẩu: gửi AJAX để báo lỗi tại chỗ, không rời trang đang làm việc. *@
+<div id="doimatkhau-modal" class="hidden fixed inset-0 z-[60] overflow-y-auto" role="dialog" aria-modal="true" aria-labelledby="doimatkhau-title">
+  <div class="fixed inset-0 bg-black/40" data-dmk-close></div>
+  <div class="relative mx-auto my-4 sm:my-[8vh] w-[min(430px,calc(100vw-2rem))] bg-surface-container-lowest rounded-xl border border-outline-variant/70 shadow-[0_18px_50px_rgba(8,30,41,0.28)] overflow-hidden">
+    <div class="flex items-center gap-2.5 px-4 py-3 bg-primary-container text-on-primary">
+      <span class="material-symbols-outlined text-[20px]">lock</span>
+      <h3 id="doimatkhau-title" class="flex-1 font-label-md text-label-md font-bold">Đổi mật khẩu</h3>
+      <button type="button" class="p-1 rounded-md hover:bg-primary transition-colors" data-dmk-close aria-label="Đóng">
+        <span class="material-symbols-outlined text-[18px]">close</span>
+      </button>
+    </div>
+    <form id="doimatkhau-form" asp-controller="Account" asp-action="ChangePassword" method="post" class="px-4 py-4 space-y-3">
+      @Html.AntiForgeryToken()
+      <p class="text-[12px] text-on-surface-variant">Tài khoản <b class="text-on-surface">@maTaiKhoan</b> — mật khẩu mới cần tối thiểu 8 ký tự.</p>
+      <div>
+        <label for="dmk-cu" class="block font-label-sm text-label-sm text-on-surface-variant mb-1">Mật khẩu hiện tại</label>
+        <input id="dmk-cu" name="MatKhauHienTai" type="password" required autocomplete="current-password"
+               class="block w-full px-3 py-2 rounded-lg border border-outline-variant bg-surface text-[13px] focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20" />
+      </div>
+      <div>
+        <label for="dmk-moi" class="block font-label-sm text-label-sm text-on-surface-variant mb-1">Mật khẩu mới</label>
+        <input id="dmk-moi" name="MatKhauMoi" type="password" required minlength="8" maxlength="100" autocomplete="new-password"
+               class="block w-full px-3 py-2 rounded-lg border border-outline-variant bg-surface text-[13px] focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20" />
+      </div>
+      <div>
+        <label for="dmk-xacnhan" class="block font-label-sm text-label-sm text-on-surface-variant mb-1">Nhập lại mật khẩu mới</label>
+        <input id="dmk-xacnhan" name="XacNhanMatKhau" type="password" required autocomplete="new-password"
+               class="block w-full px-3 py-2 rounded-lg border border-outline-variant bg-surface text-[13px] focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20" />
+      </div>
+      <p id="dmk-error" class="hidden text-[12px] text-error" role="alert"></p>
+      <div class="flex items-center justify-end gap-2 pt-1">
+        <button type="button" data-dmk-close class="px-3 py-2 rounded-lg text-[13px] font-semibold text-on-surface-variant hover:bg-surface-container transition-colors">Hủy</button>
+        <button type="submit" id="dmk-submit" class="px-4 py-2 rounded-lg bg-primary text-on-primary text-[13px] font-bold hover:bg-primary-container transition-colors disabled:opacity-60">Lưu mật khẩu</button>
+      </div>
+    </form>
+  </div>
+</div>
+<script>
+  (function () {
+    var sidebar = document.getElementById('app-sidebar');
+    var backdrop = document.getElementById('sidebar-backdrop');
+    var toggle = document.getElementById('sidebar-toggle');
+    if (!sidebar || !backdrop || !toggle) return;
+    function setOpen(open) {
+      sidebar.classList.toggle('-translate-x-full', !open);
+      backdrop.classList.toggle('hidden', !open);
+    }
+    toggle.addEventListener('click', function () {
+      setOpen(sidebar.classList.contains('-translate-x-full'));
+    });
+    backdrop.addEventListener('click', function () { setOpen(false); });
+  })();
+
+  (function () {
+    var wrap = document.getElementById('tai-khoan');
+    var btn = document.getElementById('tai-khoan-btn');
+    var menu = document.getElementById('tai-khoan-menu');
+    var caret = document.getElementById('tai-khoan-caret');
+    if (!wrap || !btn || !menu) return;
+
+    var tomTat = document.getElementById('hoso-tom-tat');
+    var chiTiet = document.getElementById('hoso-chi-tiet');
+
+    function showChiTiet(on) {
+      tomTat.classList.toggle('hidden', on);
+      chiTiet.classList.toggle('hidden', !on);
+    }
+    function setOpen(open) {
+      menu.classList.toggle('hidden', !open);
+      btn.setAttribute('aria-expanded', String(open));
+      caret.style.transform = open ? 'rotate(180deg)' : '';
+      if (!open) showChiTiet(false);
+    }
+
+    btn.addEventListener('click', function () { setOpen(menu.classList.contains('hidden')); });
+    document.getElementById('tai-khoan-close').addEventListener('click', function () { setOpen(false); });
+    document.getElementById('hoso-open').addEventListener('click', function () { showChiTiet(true); });
+    document.getElementById('hoso-back').addEventListener('click', function () { showChiTiet(false); });
+
+    document.addEventListener('click', function (e) {
+      if (!menu.classList.contains('hidden') && !wrap.contains(e.target)) setOpen(false);
+    });
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape') setOpen(false);
+    });
+  })();
+
+  (function () {
+    var modal = document.getElementById('doimatkhau-modal');
+    var moNut = document.getElementById('doimatkhau-open');
+    if (!modal || !moNut) return;
+
+    var form = document.getElementById('doimatkhau-form');
+    var loiHop = document.getElementById('dmk-error');
+    var nutLuu = document.getElementById('dmk-submit');
+    var oCu = document.getElementById('dmk-cu');
+
+    function hienLoi(thongDiep) {
+      loiHop.textContent = thongDiep;
+      loiHop.classList.remove('hidden');
+    }
+    function setOpen(open) {
+      modal.classList.toggle('hidden', !open);
+      if (open) {
+        form.reset();
+        loiHop.classList.add('hidden');
+        oCu.focus();
+      }
+    }
+
+    moNut.addEventListener('click', function () {
+      // Đóng panel tài khoản để hộp thoại không bị chồng lên menu.
+      var menu = document.getElementById('tai-khoan-menu');
+      if (menu) menu.classList.add('hidden');
+      setOpen(true);
+    });
+    modal.addEventListener('click', function (e) {
+      if (e.target.closest('[data-dmk-close]')) setOpen(false);
+    });
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape' && !modal.classList.contains('hidden')) setOpen(false);
+    });
+
+    form.addEventListener('submit', async function (e) {
+      e.preventDefault();
+      loiHop.classList.add('hidden');
+      nutLuu.disabled = true;
+      nutLuu.textContent = 'Đang lưu...';
+      try {
+        var phanHoi = await fetch(form.action, {
+          method: 'POST',
+          body: new FormData(form),
+          headers: { 'X-Requested-With': 'XMLHttpRequest' }
+        });
+        var ketQua = null;
+        try { ketQua = await phanHoi.json(); } catch (ignore) { }
+        if (phanHoi.ok && ketQua && ketQua.ok) {
+          // Tải lại trang để băng thông báo thành công (TempData) hiển thị ở đầu trang.
+          window.location.reload();
+          return;
+        }
+        hienLoi((ketQua && ketQua.message) || 'Không đổi được mật khẩu. Vui lòng thử lại.');
+      } catch (ignore) {
+        hienLoi('Không kết nối được máy chủ. Vui lòng thử lại.');
+      } finally {
+        nutLuu.disabled = false;
+        nutLuu.textContent = 'Lưu mật khẩu';
+      }
+    });
+  })();
+</script>
+@await RenderSectionAsync("Scripts", required: false)
+</body>
+</html>

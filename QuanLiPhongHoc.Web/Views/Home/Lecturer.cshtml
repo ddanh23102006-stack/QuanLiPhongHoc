@@ -1,0 +1,134 @@
+@using QuanLiPhongHoc.Web.Models.Domain
+@{
+    ViewData["Title"] = "Cổng giảng viên";
+    var thongBao = ViewBag.ThongBao as QuanLiPhongHoc.Web.Models.ViewModels.ThongBaoHomeVm;
+    var lich = ViewBag.Lich as IEnumerable<LichHoc> ?? [];
+    var today = DateTime.Today;
+    var dayOfWeek = today.DayOfWeek switch
+    {
+        DayOfWeek.Monday => "Thứ Hai",
+        DayOfWeek.Tuesday => "Thứ Ba",
+        DayOfWeek.Wednesday => "Thứ Tư",
+        DayOfWeek.Thursday => "Thứ Năm",
+        DayOfWeek.Friday => "Thứ Sáu",
+        DayOfWeek.Saturday => "Thứ Bảy",
+        DayOfWeek.Sunday => "Chủ Nhật",
+        _ => ""
+    };
+}
+
+<!-- Breadcrumb Navigation -->
+<nav class="flex items-center gap-2 mb-4 text-on-surface-variant font-label-md text-label-md">
+    <a class="hover:text-primary transition-colors flex items-center gap-1" href="/">
+        <span class="material-symbols-outlined text-[16px]">home</span>
+        Trang chủ
+    </a>
+    <span class="material-symbols-outlined text-[14px] text-outline">chevron_right</span>
+    <span class="text-primary font-semibold">Cổng thông tin giảng viên</span>
+</nav>
+
+<!-- Clean Welcome / Date Strip -->
+<div class="flex flex-col sm:flex-row sm:items-center justify-between pb-4 mb-4 border-b border-outline-variant/80 gap-2">
+    <div class="flex items-center gap-2">
+        <h1 class="font-headline-md text-headline-md text-primary font-bold">Xin chào, @((string?)ViewBag.HoTen ?? User.Identity?.Name)!</h1>
+        <span class="text-on-surface-variant text-sm font-normal">• Giảng viên</span>
+    </div>
+    <div class="text-xs text-on-surface-variant flex items-center gap-2">
+        <span class="material-symbols-outlined text-[16px] text-primary">today</span>
+        <span class="font-semibold text-primary">@dayOfWeek, @today.ToString("dd/MM/yyyy")</span>
+    </div>
+</div>
+
+<!-- KHỐI BẢNG THÔNG BÁO CHÍNH -->
+<partial name="_ThongBaoBlock" model="thongBao" />
+
+<!-- Phản hồi mới từ CSVC -->
+<partial name="_SuCoPhanHoi" model="ViewBag.SuCoPhanHoi as IEnumerable<SuCo>" />
+
+<!-- Quick Access Section -->
+<section class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+    <a href="/LichHoc" class="bg-surface-container-lowest border border-outline-variant/70 hover:border-primary rounded-xl p-4 flex items-center gap-3.5 transition-all group shadow-sm hover:shadow">
+        <div class="w-10 h-10 rounded-lg bg-surface-container flex items-center justify-center text-primary group-hover:bg-primary group-hover:text-white transition-colors shrink-0">
+            <span class="material-symbols-outlined text-[22px]">calendar_month</span>
+        </div>
+        <div>
+            <h4 class="font-bold text-sm text-slate-800 group-hover:text-primary transition-colors">Thời khóa biểu</h4>
+            <p class="text-[11px] text-on-surface-variant">Tra cứu lịch giảng dạy</p>
+        </div>
+    </a>
+    <a href="/DatPhong/Create" class="bg-surface-container-lowest border border-outline-variant/70 hover:border-primary rounded-xl p-4 flex items-center gap-3.5 transition-all group shadow-sm hover:shadow">
+        <div class="w-10 h-10 rounded-lg bg-surface-container flex items-center justify-center text-primary group-hover:bg-primary group-hover:text-white transition-colors shrink-0">
+            <span class="material-symbols-outlined text-[22px]">meeting_room</span>
+        </div>
+        <div>
+            <h4 class="font-bold text-sm text-slate-800 group-hover:text-primary transition-colors">Mượn phòng</h4>
+            <p class="text-[11px] text-on-surface-variant">Đăng ký phòng bù, hội họp</p>
+        </div>
+    </a>
+    <a href="/DonXinNghi/Create" class="bg-surface-container-lowest border border-outline-variant/70 hover:border-primary rounded-xl p-4 flex items-center gap-3.5 transition-all group shadow-sm hover:shadow">
+        <div class="w-10 h-10 rounded-lg bg-surface-container flex items-center justify-center text-primary group-hover:bg-primary group-hover:text-white transition-colors shrink-0">
+            <span class="material-symbols-outlined text-[22px]">fact_check</span>
+        </div>
+        <div>
+            <h4 class="font-bold text-sm text-slate-800 group-hover:text-primary transition-colors">Đơn xin nghỉ</h4>
+            <p class="text-[11px] text-on-surface-variant">Gửi đơn nghỉ và dạy bù</p>
+        </div>
+    </a>
+    <a href="/SuCo/Create" class="bg-surface-container-lowest border border-outline-variant/70 hover:border-error rounded-xl p-4 flex items-center gap-3.5 transition-all group shadow-sm hover:shadow">
+        <div class="w-10 h-10 rounded-lg bg-error-container/60 flex items-center justify-center text-error group-hover:bg-error group-hover:text-white transition-colors shrink-0">
+            <span class="material-symbols-outlined text-[22px]">report_problem</span>
+        </div>
+        <div>
+            <h4 class="font-bold text-sm text-slate-800 group-hover:text-error transition-colors">Báo cáo sự cố</h4>
+            <p class="text-[11px] text-on-surface-variant">Phản ánh hư hỏng thiết bị</p>
+        </div>
+    </a>
+</section>
+
+<!-- Lịch dạy gần nhất -->
+<section class="bg-surface-container-lowest border border-outline-variant/80 rounded-xl shadow-sm overflow-hidden mb-6">
+    <div class="px-5 py-3 border-b border-outline-variant/60 flex items-center justify-between">
+        <h2 class="font-bold text-slate-800 flex items-center gap-2">
+            <span class="material-symbols-outlined text-primary text-[20px]">menu_book</span>
+            Lịch giảng dạy sắp tới
+        </h2>
+        <a href="/LichHoc" class="text-xs text-primary hover:underline font-semibold">Xem toàn bộ lịch dạy ›</a>
+    </div>
+    <div class="p-0 overflow-x-auto">
+        <table class="w-full text-sm text-left">
+            <thead>
+                <tr class="bg-surface-container-low/50 text-on-surface-variant">
+                    <th class="px-5 py-3 font-semibold">Ngày học</th>
+                    <th class="px-5 py-3 font-semibold">Ca</th>
+                    <th class="px-5 py-3 font-semibold">Học phần</th>
+                    <th class="px-5 py-3 font-semibold">Phòng</th>
+                    <th class="px-5 py-3 font-semibold text-right">Trạng thái</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-outline-variant/40">
+                @if (!lich.Any())
+                {
+                    <tr>
+                        <td colspan="5" class="px-5 py-8 text-center text-on-surface-variant italic">Không có lịch giảng dạy nào sắp tới.</td>
+                    </tr>
+                }
+                @foreach (var x in lich)
+                {
+                    <tr class="hover:bg-surface-container-low/30 transition-colors">
+                        <td class="px-5 py-3 font-medium">@x.NgayHoc.ToString("dd/MM/yyyy")</td>
+                        <td class="px-5 py-3">
+                            <span class="px-2 py-0.5 bg-secondary-container text-on-secondary-container rounded text-[11px] font-bold uppercase">@Catalogs.LabelCa(x.CaHoc)</span>
+                        </td>
+                        <td class="px-5 py-3">@x.HocPhan?.TenHocPhan</td>
+                        <td class="px-5 py-3 font-mono text-primary font-bold">@x.PhongHoc?.CodePhong</td>
+                        <td class="px-5 py-3 text-right">
+                            <span class="text-tertiary font-semibold text-xs flex items-center justify-end gap-1">
+                                <span class="w-1.5 h-1.5 bg-tertiary rounded-full"></span> Đã xếp lịch
+                            </span>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</section>

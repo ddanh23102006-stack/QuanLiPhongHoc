@@ -1,0 +1,209 @@
+@model ToaNhaChiTietVm
+@{
+    ViewData["Title"] = Model.ToaNha.CodeToaNha;
+    var t = Model.ToaNha;
+    string MauToa(string tt) => tt switch
+    {
+        "ACTIVE" => "bg-tertiary-container/15 text-tertiary",
+        "MAINTENANCE" => "bg-amber-50 text-amber-700 border border-amber-300",
+        _ => "bg-error-container text-on-error-container"
+    };
+    string MauSuCo(string? tt) => tt switch
+    {
+        "RESOLVED" => "bg-tertiary-container/15 text-tertiary",
+        "IN_PROGRESS" => "bg-primary-fixed text-on-primary-fixed-variant",
+        _ => "bg-error-container text-on-error-container"
+    };
+    var suCoMo = Model.SuCo.Where(x => x.TrangThai != "RESOLVED").ToList();
+    var suCoXong = Model.SuCo.Where(x => x.TrangThai == "RESOLVED").ToList();
+}
+<div class="flex flex-wrap items-start justify-between gap-space-md mb-space-md">
+  <div>
+    <div class="text-xs text-on-surface-variant">CSVC / <a class="text-primary" href="/ToaNha">Tòa nhà</a> / <span class="font-bold">@t.CodeToaNha</span></div>
+    <h1 class="text-xl font-bold">@t.CodeToaNha — @t.TenToaNha</h1>
+    <p class="text-sm text-on-surface-variant mt-1">
+      @(string.IsNullOrWhiteSpace(t.DiaChi) ? "Chưa cập nhật địa chỉ" : t.DiaChi)
+      · @(t.SoTang is int st ? $"{st} tầng" : "Chưa rõ số tầng")
+    </p>
+    <span class="inline-block mt-2 px-2 py-0.5 rounded text-xs font-semibold @MauToa(t.TrangThaiHoatDong)">@Catalogs.LabelTrangThaiToaNha(t.TrangThaiHoatDong)</span>
+  </div>
+  <div class="flex flex-wrap items-center gap-2">
+    <form asp-action="DoiTrangThai" method="post" class="flex items-center gap-2 bg-surface-container-lowest p-2 rounded-lg shadow-sm">
+      <input type="hidden" name="id" value="@t.MaToaNha" />
+      <input type="hidden" name="returnUrl" value="/ToaNha/Details/@t.MaToaNha" />
+      <select name="trangThai" class="rounded bg-surface-container-low text-sm px-2 py-1">
+        @foreach (var kv in Catalogs.TrangThaiToaNha)
+        {
+          <option value="@kv.Key" selected="@(kv.Key == t.TrangThaiHoatDong)">@kv.Value</option>
+        }
+      </select>
+      <button class="text-primary text-sm font-semibold">Cập nhật</button>
+    </form>
+    <a class="px-3 py-2 rounded-lg bg-tertiary-container text-on-tertiary font-semibold text-sm" href="/ToaNha/XuatBaoCao/@t.MaToaNha">Xuất báo cáo Excel</a>
+    <a class="px-3 py-2 rounded-lg bg-surface-container text-on-surface font-semibold text-sm" href="/ToaNha/Edit/@t.MaToaNha">Sửa thông tin</a>
+    <a class="px-3 py-2 rounded-lg bg-surface-container text-on-surface font-semibold text-sm" href="/ToaNha">← Danh sách</a>
+  </div>
+</div>
+
+@if (t.TrangThaiHoatDong != "ACTIVE")
+{
+  <div class="mb-space-md px-space-md py-2.5 rounded-lg bg-amber-50 text-amber-800 border border-amber-300 text-sm">
+    Tòa nhà đang <b>@Catalogs.LabelTrangThaiToaNha(t.TrangThaiHoatDong).ToLowerInvariant()</b> — toàn bộ phòng bên trong đang bị coi là bảo trì trên trang đăng ký mượn phòng.
+  </div>
+}
+
+<div class="grid grid-cols-2 lg:grid-cols-4 gap-space-md mb-space-md">
+  <div class="bg-surface-container-lowest rounded-xl p-space-lg shadow-sm">
+    <div class="text-xs uppercase text-on-surface-variant font-semibold">Phòng học</div>
+    <div class="text-2xl font-bold mt-1">@Model.Phong.Count</div>
+    <p class="text-xs text-on-surface-variant mt-1">@Model.TongSucChua chỗ · @Model.PhongBaoTri phòng bảo trì</p>
+  </div>
+  <div class="bg-surface-container-lowest rounded-xl p-space-lg shadow-sm">
+    <div class="text-xs uppercase text-on-surface-variant font-semibold">Thiết bị</div>
+    <div class="text-2xl font-bold mt-1">@Model.SoThietBi</div>
+    <p class="text-xs text-on-surface-variant mt-1">Đang phân bổ trong tòa</p>
+  </div>
+  <div class="bg-surface-container-lowest rounded-xl p-space-lg shadow-sm">
+    <div class="text-xs uppercase text-on-surface-variant font-semibold">Thiết bị cần xử lý</div>
+    <div class="text-2xl font-bold text-error mt-1">@Model.ThietBiCanXuLy</div>
+    <p class="text-xs text-on-surface-variant mt-1">Hỏng, mất hoặc đang sửa</p>
+  </div>
+  <div class="bg-surface-container-lowest rounded-xl p-space-lg shadow-sm">
+    <div class="text-xs uppercase text-on-surface-variant font-semibold">Sự cố mở</div>
+    <div class="text-2xl font-bold text-error mt-1">@suCoMo.Count</div>
+    <p class="text-xs text-on-surface-variant mt-1">@suCoXong.Count sự cố đã giải quyết</p>
+  </div>
+</div>
+
+<div class="bg-surface-container-lowest rounded-xl shadow-sm overflow-hidden mb-space-md">
+  <div class="flex flex-wrap items-center justify-between gap-2 px-space-lg py-3 border-b border-surface-container">
+    <h2 class="font-semibold">Danh sách phòng học thuộc @t.CodeToaNha</h2>
+    <div class="flex items-center gap-2">
+      <a class="text-primary text-sm font-semibold" href="/PhongHoc?toa=@t.MaToaNha">Mở trong Quản lý phòng</a>
+      <a class="px-3 py-1.5 rounded-lg bg-primary-container text-on-primary text-sm font-semibold" href="/PhongHoc?toa=@t.MaToaNha&them=1">+ Thêm phòng</a>
+    </div>
+  </div>
+  <div class="overflow-x-auto">
+  <table class="w-full text-sm">
+    <thead class="bg-surface-container text-left">
+      <tr>
+        <th class="p-3">Mã phòng</th>
+        <th class="p-3">Loại phòng</th>
+        <th class="p-3">Sức chứa</th>
+        <th class="p-3">Trạng thái</th>
+        <th class="p-3">Thiết bị</th>
+        <th class="p-3">Sự cố mở</th>
+        <th class="p-3"></th>
+      </tr>
+    </thead>
+    <tbody>
+    @foreach (var row in Model.Phong)
+    {
+      var p = row.Phong;
+      <tr class="border-t border-surface-container hover:bg-surface-container-low">
+        <td class="p-3 font-semibold">
+          <a class="text-primary" href="/PhongHoc/Details/@p.MaPhong">@p.CodePhong</a>
+        </td>
+        <td class="p-3">@Catalogs.LabelLoaiPhong(p.LoaiPhong)</td>
+        <td class="p-3 font-mono">@p.SucChua</td>
+        <td class="p-3">@Catalogs.LabelTrangThaiPhong(p.TrangThaiPhong)</td>
+        <td class="p-3">
+          <span class="font-semibold">@row.ThietBi</span>
+          @if (row.ThietBiCanXuLy > 0)
+          {
+            <span class="ml-1 text-xs text-error font-semibold">(@row.ThietBiCanXuLy cần xử lý)</span>
+          }
+        </td>
+        <td class="p-3">
+          @if (row.SuCoMo > 0)
+          {
+            <span class="px-2 py-0.5 rounded bg-error-container text-on-error-container text-xs font-semibold">@row.SuCoMo</span>
+          }
+          else
+          {
+            <span class="text-xs text-on-surface-variant">0</span>
+          }
+        </td>
+        <td class="p-3 whitespace-nowrap">
+          <a class="text-primary text-sm font-semibold" href="/PhongHoc/Details/@p.MaPhong">Xem phòng &amp; thiết bị</a>
+        </td>
+      </tr>
+    }
+    @if (Model.Phong.Count == 0)
+    {
+      <tr><td colspan="7" class="p-6 text-center text-on-surface-variant">Tòa nhà chưa có phòng học nào.</td></tr>
+    }
+    </tbody>
+  </table>
+  </div>
+</div>
+
+<div class="grid grid-cols-1 xl:grid-cols-2 gap-space-md">
+  <div class="bg-surface-container-lowest rounded-xl shadow-sm overflow-hidden">
+    <div class="flex items-center justify-between px-space-lg py-3 border-b border-surface-container">
+      <h2 class="font-semibold">Sự cố hạ tầng cần xử lý (@suCoMo.Count)</h2>
+      <a class="text-primary text-sm font-semibold" href="/SuCo?toa=@t.MaToaNha">Xem tất cả</a>
+    </div>
+    <div class="divide-y divide-surface-container">
+      @foreach (var s in suCoMo)
+      {
+        <div class="p-space-md">
+          <div class="flex flex-wrap items-center gap-2">
+            <a class="font-semibold text-primary" href="/PhongHoc/Details/@s.MaPhong">@s.PhongHoc?.CodePhong</a>
+            <span class="text-xs px-2 py-0.5 rounded @MauSuCo(s.TrangThai)">@Catalogs.Label(Catalogs.TrangThaiSuCo, s.TrangThai)</span>
+            <span class="text-xs text-on-surface-variant">@Catalogs.LabelLoaiSuCo(s.LoaiSuCo)</span>
+            <span class="ml-auto text-xs text-on-surface-variant">@s.NgayTao.ToString("dd/MM/yyyy HH:mm")</span>
+          </div>
+          <p class="text-sm mt-1">@s.MoTa</p>
+          @if (s.ChiTietSuCos.Any(x => x.PhongThietBi != null))
+          {
+            <div class="flex flex-wrap gap-1 mt-1">
+              @foreach (var ct in s.ChiTietSuCos.Where(x => x.PhongThietBi != null))
+              {
+                <span class="px-1.5 py-0.5 rounded bg-surface-container text-xs">@ct.PhongThietBi?.NhanDienThietBi (@ct.PhongThietBi?.ThietBi?.TenThietBi)</span>
+              }
+            </div>
+          }
+          <form asp-controller="SuCo" asp-action="UpdateStatus" method="post" class="mt-2 flex flex-wrap items-center gap-2">
+            <input type="hidden" name="id" value="@s.MaSuCo" />
+            <input type="hidden" name="returnUrl" value="/ToaNha/Details/@t.MaToaNha" />
+            <select name="status" class="rounded bg-surface-container-low text-sm px-2 py-1">
+              @foreach (var kv in Catalogs.TrangThaiSuCo)
+              {
+                <option value="@kv.Key" selected="@(kv.Key == s.TrangThai)">@kv.Value</option>
+              }
+            </select>
+            <button class="text-primary text-sm font-semibold">Cập nhật xử lý</button>
+          </form>
+        </div>
+      }
+      @if (suCoMo.Count == 0)
+      {
+        <div class="p-6 text-center text-sm text-on-surface-variant">Không có sự cố nào cần xử lý.</div>
+      }
+    </div>
+  </div>
+
+  <div class="bg-surface-container-lowest rounded-xl shadow-sm overflow-hidden">
+    <div class="px-space-lg py-3 border-b border-surface-container">
+      <h2 class="font-semibold">Sự cố đã giải quyết gần đây (@suCoXong.Count)</h2>
+    </div>
+    <div class="divide-y divide-surface-container">
+      @foreach (var s in suCoXong.Take(10))
+      {
+        <div class="p-space-md">
+          <div class="flex flex-wrap items-center gap-2">
+            <a class="font-semibold text-primary" href="/PhongHoc/Details/@s.MaPhong">@s.PhongHoc?.CodePhong</a>
+            <span class="text-xs px-2 py-0.5 rounded @MauSuCo(s.TrangThai)">@Catalogs.Label(Catalogs.TrangThaiSuCo, s.TrangThai)</span>
+            <span class="ml-auto text-xs text-on-surface-variant">@s.NgayTao.ToString("dd/MM/yyyy HH:mm")</span>
+          </div>
+          <p class="text-sm mt-1 text-on-surface-variant">@s.MoTa</p>
+        </div>
+      }
+      @if (suCoXong.Count == 0)
+      {
+        <div class="p-6 text-center text-sm text-on-surface-variant">Chưa có sự cố nào được giải quyết.</div>
+      }
+    </div>
+  </div>
+</div>

@@ -1,0 +1,122 @@
+@model ThongBaoFormVm
+@{
+    var isEdit = Model.MaThongBao > 0;
+    ViewData["Title"] = isEdit ? "Sửa thông báo" : "Đăng thông báo";
+    var doiTuongs = ThongBaoDoiTuong.Ten;
+}
+
+<div class="flex flex-wrap items-center justify-between gap-space-md mb-space-md">
+  <div>
+    <div class="text-xs text-on-surface-variant">Đào tạo / <a class="text-primary" href="/ThongBao/Manage">Thông báo</a> / <span class="font-bold">@(isEdit ? "Sửa" : "Thêm mới")</span></div>
+    <h1 class="text-xl font-bold">@(isEdit ? "Sửa thông báo" : "Đăng thông báo mới")</h1>
+  </div>
+  <a class="px-3 py-2 rounded-lg bg-surface-container text-on-surface font-semibold text-sm" href="/ThongBao/Manage">← Danh sách</a>
+</div>
+
+<form asp-action="Save" method="post" enctype="multipart/form-data" class="bg-surface-container-lowest rounded-xl shadow-sm p-space-lg max-w-4xl">
+  <div asp-validation-summary="ModelOnly" class="text-error text-sm mb-space-md"></div>
+  <input type="hidden" asp-for="MaThongBao" />
+
+  <div class="space-y-4">
+    <div>
+      <label asp-for="TieuDe" class="block text-xs font-semibold text-on-surface-variant mb-1">Tiêu đề <span class="text-error">*</span></label>
+      <input asp-for="TieuDe" class="w-full rounded-lg bg-surface-container-low px-3 py-2 text-sm" placeholder="VD: Kế hoạch tổ chức đăng ký học phần học kỳ 1 năm học 2026-2027" />
+      <span asp-validation-for="TieuDe" class="text-error text-xs"></span>
+    </div>
+
+    <div>
+      <label asp-for="NoiDung" class="block text-xs font-semibold text-on-surface-variant mb-1">Nội dung toàn văn <span class="text-error">*</span></label>
+      <textarea asp-for="NoiDung" rows="14" class="w-full rounded-lg bg-surface-container-low px-3 py-2 text-sm font-mono leading-relaxed" placeholder="Mỗi dòng trống được hiển thị là một đoạn văn."></textarea>
+      <span asp-validation-for="NoiDung" class="text-error text-xs"></span>
+      <p class="text-[11px] text-on-surface-variant mt-1">Nội dung lưu dạng văn bản thuần, hệ thống tự giữ ngắt dòng và chống chèn HTML.</p>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div>
+        <label asp-for="DoiTuong" class="block text-xs font-semibold text-on-surface-variant mb-1">Đối tượng nhận tin</label>
+        <select asp-for="DoiTuong" class="w-full rounded-lg bg-surface-container-low px-3 py-2 text-sm">
+          @foreach (var (code, ten) in doiTuongs)
+          {
+            <option value="@code">@ten</option>
+          }
+        </select>
+      </div>
+      <div>
+        <label asp-for="NgayDang" class="block text-xs font-semibold text-on-surface-variant mb-1">Ngày đăng</label>
+        <input asp-for="NgayDang" type="date" class="w-full rounded-lg bg-surface-container-low px-3 py-2 text-sm font-mono" />
+      </div>
+      <div>
+        <label asp-for="TrangThai" class="block text-xs font-semibold text-on-surface-variant mb-1">Trạng thái</label>
+        <select asp-for="TrangThai" class="w-full rounded-lg bg-surface-container-low px-3 py-2 text-sm">
+          <option value="PUBLISHED">Đã đăng</option>
+          <option value="DRAFT">Bản nháp</option>
+        </select>
+      </div>
+    </div>
+
+    <div>
+      <label class="block text-xs font-semibold text-on-surface-variant mb-1">Ảnh đại diện</label>
+      <div class="flex flex-col sm:flex-row gap-4 items-start">
+        <div id="oXemTruong" class="w-44 h-32 shrink-0 rounded-lg overflow-hidden border border-outline-variant/60 bg-surface-container-low flex items-center justify-center text-[11px] text-on-surface-variant text-center px-2">
+          @if (string.IsNullOrWhiteSpace(Model.AnhDaiDien))
+          {
+            <span>Chưa có ảnh — trang chủ dùng ảnh loa mặc định</span>
+          }
+          else
+          {
+            <img src="@Model.AnhDaiDien" alt="Ảnh đại diện hiện tại" class="w-full h-full object-cover" />
+          }
+        </div>
+        <div class="flex-1 w-full space-y-2">
+          <input asp-for="AnhFile" type="file" accept="image/jpeg,image/png,image/gif,image/webp"
+                 class="block w-full text-sm rounded-lg bg-surface-container-low px-3 py-2 file:mr-3 file:px-3 file:py-1.5 file:rounded-md file:border-0 file:bg-primary-container file:text-on-primary file:font-semibold file:text-sm" />
+          <span asp-validation-for="AnhFile" class="text-error text-xs block"></span>
+          <p class="text-[11px] text-on-surface-variant">
+            Nhận JPG, PNG, GIF, WEBP, tối đa @(ThongBaoFormVm.MaxDungLuongByte / (1024 * 1024)) MB.
+            Ảnh được lưu vào thư mục <code class="font-mono">/uploads/thongbao</code>. Chọn tệp mới sẽ thay ảnh hiện tại.
+          </p>
+          <label class="inline-flex items-center gap-2 text-sm">
+            <input asp-for="XoaAnh" class="w-4 h-4 rounded" /> <span>Gỡ ảnh, quay lại ảnh loa mặc định</span>
+          </label>
+          <details class="text-sm">
+            <summary class="cursor-pointer text-xs font-semibold text-on-surface-variant hover:text-primary">
+              Hoặc nhập đường dẫn ảnh có sẵn trên server
+            </summary>
+            <input asp-for="AnhDaiDien" class="mt-2 w-full rounded-lg bg-surface-container-low px-3 py-2 text-sm font-mono" placeholder="/img/news/ten-anh.jpg" />
+            <span asp-validation-for="AnhDaiDien" class="text-error text-xs"></span>
+          </details>
+        </div>
+      </div>
+    </div>
+
+    <div class="flex flex-wrap gap-6 pt-1">
+      <label class="inline-flex items-center gap-2 text-sm">
+        <input asp-for="LaMoi" class="w-4 h-4 rounded" /> <span>Gắn nhãn NEW</span>
+      </label>
+      <label class="inline-flex items-center gap-2 text-sm">
+        <input asp-for="NoiBat" class="w-4 h-4 rounded" /> <span>Tin nổi bật (hiện ở cột ảnh lớn trên trang chủ)</span>
+      </label>
+    </div>
+  </div>
+
+  <div class="flex gap-2 mt-space-lg">
+    <button type="submit" class="px-4 py-2 rounded-lg bg-primary-container text-on-primary font-semibold text-sm">Lưu thông báo</button>
+    <a class="px-4 py-2 rounded-lg bg-surface-container text-on-surface font-semibold text-sm" href="/ThongBao/Manage">Hủy</a>
+  </div>
+</form>
+
+@section Scripts {
+  <script>
+    const oXemTruong = document.getElementById('oXemTruong');
+    document.getElementById('AnhFile')?.addEventListener('change', e => {
+      const f = e.target.files[0];
+      if (!f || !oXemTruong) return;
+      oXemTruong.replaceChildren();
+      const img = document.createElement('img');
+      img.className = 'w-full h-full object-cover';
+      img.alt = 'Xem trước ảnh vừa chọn';
+      img.src = URL.createObjectURL(f);
+      oXemTruong.appendChild(img);
+    });
+  </script>
+}

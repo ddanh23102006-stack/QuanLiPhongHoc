@@ -1,0 +1,22 @@
+@model ToaNhaFormVm
+@{
+    ViewData["Title"] = "Sửa tòa nhà";
+    var quayLai = ViewBag.ReturnUrl as string ?? $"/ToaNha/Details/{Model.MaToaNha}";
+}
+<div class="flex flex-wrap items-center justify-between gap-space-md mb-space-md">
+  <div>
+    <div class="text-xs text-on-surface-variant">CSVC / <a class="text-primary" href="/ToaNha">Tòa nhà</a> / <a class="text-primary" href="/ToaNha/Details/@Model.MaToaNha">@Model.CodeToaNha</a> / <span class="font-bold">Sửa</span></div>
+    <h1 class="text-xl font-bold">Cập nhật tòa nhà @Model.CodeToaNha</h1>
+  </div>
+  <a class="px-3 py-2 rounded-lg bg-surface-container text-on-surface font-semibold text-sm" href="/ToaNha/Details/@Model.MaToaNha">← Chi tiết</a>
+</div>
+
+<form asp-action="Edit" method="post" class="bg-surface-container-lowest rounded-xl shadow-sm p-space-lg max-w-3xl">
+  <input type="hidden" asp-for="MaToaNha" />
+  <input type="hidden" name="returnUrl" value="@quayLai" />
+  <partial name="_Form" model="Model" />
+  <div class="flex gap-2 mt-space-lg">
+    <button type="submit" class="px-4 py-2 rounded-lg bg-primary-container text-on-primary font-semibold text-sm">Cập nhật</button>
+    <a class="px-4 py-2 rounded-lg bg-surface-container text-on-surface font-semibold text-sm" href="@quayLai">Hủy</a>
+  </div>
+</form>

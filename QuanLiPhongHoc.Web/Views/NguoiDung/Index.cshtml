@@ -1,0 +1,52 @@
+@model IEnumerable<NguoiDung>
+@{
+  ViewData["Title"] = "Người dùng";
+  var page = (int)ViewBag.Page;
+  var soTrang = (int)ViewBag.SoTrang;
+  var tongSo = (int)ViewBag.TongSo;
+  string Trang(int p) => $"/NguoiDung?page={p}";
+}
+<div class="flex justify-between mb-space-md">
+  <div>
+    <h1 class="text-xl font-bold">Quản trị người dùng &amp; phân quyền</h1>
+    <p class="text-xs text-on-surface-variant">@tongSo tài khoản · trang @(page)/@soTrang</p>
+  </div>
+  <a href="/NguoiDung/Create" class="px-3 py-2 bg-primary-container text-on-primary rounded-lg font-semibold">+ Tài khoản</a>
+</div>
+<div class="bg-surface-container-lowest rounded-xl shadow-sm overflow-x-auto">
+<table class="w-full text-sm">
+  <thead class="bg-surface-container text-left"><tr>
+    <th class="p-3">Mã</th><th>Họ tên</th><th>Email</th><th>Vai trò</th><th>Khóa</th><th></th>
+  </tr></thead>
+  <tbody>
+  @foreach (var u in Model) {
+    <tr class="border-t border-surface-container">
+      <td class="p-3 font-mono">@u.MaNguoiDung</td>
+      <td>@u.HoTen</td>
+      <td>@u.Email</td>
+      <td>@string.Join(", ", u.NguoiDungVaiTros.Select(x => x.VaiTro.TenVaiTro ?? x.VaiTro.CodeVaiTro))</td>
+      <td>@(u.BiKhoa ? "Có" : "Không")</td>
+      <td><a class="text-primary" href="/NguoiDung/Edit/@u.MaNguoiDung">Sửa</a></td>
+    </tr>
+  }
+  </tbody>
+</table>
+</div>
+
+@if (soTrang > 1)
+{
+  <nav class="flex items-center justify-center gap-1.5 text-sm mt-space-md">
+    @if (page > 1)
+    {
+      <a href="@Trang(page - 1)" class="px-3 py-1.5 rounded-lg border border-outline-variant text-on-surface-variant hover:bg-surface-container-low">‹ Trước</a>
+    }
+    @for (var p = 1; p <= soTrang; p++)
+    {
+      <a href="@Trang(p)" class="px-3 py-1.5 rounded-lg border @(p == page ? "bg-primary text-on-primary border-primary font-semibold" : "border-outline-variant text-on-surface-variant hover:bg-surface-container-low")">@p</a>
+    }
+    @if (page < soTrang)
+    {
+      <a href="@Trang(page + 1)" class="px-3 py-1.5 rounded-lg border border-outline-variant text-on-surface-variant hover:bg-surface-container-low">Sau ›</a>
+    }
+  </nav>
+}

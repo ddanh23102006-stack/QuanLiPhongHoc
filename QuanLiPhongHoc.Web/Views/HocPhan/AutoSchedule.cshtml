@@ -1,0 +1,231 @@
+@model AutoScheduleOptions
+@{
+    ViewData["Title"] = "Xếp lịch tự động";
+    var hocPhans = ViewBag.HocPhans as IEnumerable<HocPhan> ?? [];
+    var ketQua = ViewBag.Result as AutoScheduleResult;
+    var daChay = ketQua is not null;
+    var assigned = ketQua?.Assigned ?? [];
+    var ngayTkb = assigned.Select(x => x.NgayHoc).Distinct().OrderBy(x => x).ToList();
+    var caTkb = Catalogs.CaHocSettings.OrderBy(x => x.GioBatDau).ToList();
+    string TenThu(DateOnly d) => d.DayOfWeek switch
+    {
+        DayOfWeek.Monday => "Thứ 2",
+        DayOfWeek.Tuesday => "Thứ 3",
+        DayOfWeek.Wednesday => "Thứ 4",
+        DayOfWeek.Thursday => "Thứ 5",
+        DayOfWeek.Friday => "Thứ 6",
+        DayOfWeek.Saturday => "Thứ 7",
+        _ => "Chủ nhật"
+    };
+}
+<div class="flex flex-wrap items-center justify-between gap-space-md mb-space-md">
+  <div>
+    <div class="text-xs text-on-surface-variant">Đào tạo / <a class="text-primary" href="/HocPhan">Học phần</a> / <span class="font-bold">Xếp lịch tự động</span></div>
+    <h1 class="text-xl font-bold">Xếp lịch tự động (Backtracking + MRV)</h1>
+    <p class="text-sm text-on-surface-variant mt-1">Giữ nguyên quy trình lọc phòng phù hợp → xét ngày/ca → kiểm tra trùng thời gian → quay lui khi bế tắc. Danh sách phòng, tòa nhà, khung trống và tình trạng thiết bị được lấy trực tiếp từ dữ liệu Cơ sở vật chất; phòng cần đủ thiết bị chuẩn đang ở trạng thái Tốt.</p>
+  </div>
+  <div class="flex flex-wrap gap-2">
+    <a class="px-3 py-2 rounded-lg bg-surface-container text-on-surface font-semibold text-sm" href="/HocPhan">
+      <span class="material-symbols-outlined text-[18px] align-middle">menu_book</span> Danh mục học phần
+    </a>
+    <a class="px-3 py-2 rounded-lg bg-surface-container text-on-surface font-semibold text-sm" href="/LichHoc">
+      <span class="material-symbols-outlined text-[18px] align-middle">arrow_back</span> Thời khóa biểu tuần
+    </a>
+  </div>
+</div>
+
+<form asp-action="AutoSchedule" method="post" class="bg-surface-container-lowest rounded-xl shadow-sm p-space-lg mb-space-lg">
+  <div class="grid grid-cols-1 md:grid-cols-3 gap-space-md">
+    <div>
+      <label class="block text-xs font-semibold text-on-surface-variant mb-1">Từ ngày</label>
+      <input type="date" name="StartDate" value="@Model.StartDate.ToString("yyyy-MM-dd")" class="w-full rounded-lg bg-surface-container-low px-3 py-2 text-sm" />
+    </div>
+    <div>
+      <label class="block text-xs font-semibold text-on-surface-variant mb-1">Đến ngày</label>
+      <input type="date" name="EndDate" value="@Model.EndDate.ToString("yyyy-MM-dd")" class="w-full rounded-lg bg-surface-container-low px-3 py-2 text-sm" />
+    </div>
+    <div>
+      <label class="block text-xs font-semibold text-on-surface-variant mb-1">Giới hạn nút duyệt</label>
+      <input type="number" name="MaxNodes" min="1000" step="1000" value="@(Model.MaxNodes <= 0 ? 200000 : Model.MaxNodes)" class="w-full rounded-lg bg-surface-container-low px-3 py-2 text-sm font-mono" />
+    </div>
+  </div>
+
+  <div class="grid grid-cols-1 md:grid-cols-2 gap-space-lg mt-space-md">
+    <div>
+      <div class="flex items-center justify-between mb-1">
+        <label class="text-xs font-semibold text-on-surface-variant">Ca học cho phép</label>
+        <span class="text-xs text-on-surface-variant">@(Catalogs.CaHoc.Length) ca</span>
+      </div>
+      <div class="flex flex-wrap gap-2 max-h-48 overflow-y-auto rounded-lg bg-surface-container-low p-space-md">
+        @foreach (var ca in Catalogs.CaHoc)
+        {
+          <label class="inline-flex items-center gap-2 text-sm bg-surface-container-lowest rounded-lg px-2.5 py-1.5 border border-outline-variant">
+            <input type="checkbox" name="caHocs" value="@ca.Code" checked class="w-4 h-4 rounded" />
+            <span>@ca.Label <span class="text-on-surface-variant text-xs font-mono">@ca.Time</span></span>
+          </label>
+        }
+      </div>
+    </div>
+    <div>
+      <div class="flex items-center justify-between mb-1">
+        <label class="text-xs font-semibold text-on-surface-variant">Lớp học phần cần xếp</label>
+        <label class="inline-flex items-center gap-2 text-xs"><input type="checkbox" id="chkAll" checked class="w-4 h-4 rounded" /> Chọn tất cả</label>
+      </div>
+      <div class="rounded-lg bg-surface-container-low p-space-md max-h-48 overflow-y-auto">
+        @foreach (var hp in hocPhans)
+        {
+          <label class="flex items-center gap-2 text-sm py-1">
+            <input type="checkbox" name="maHocPhans" value="@hp.MaHocPhan" checked class="chk-hp w-4 h-4 rounded" />
+            <span class="font-mono text-primary">@hp.MaHocPhan</span>
+            <span class="truncate">@hp.TenHocPhan</span>
+            <span class="ml-auto text-xs text-on-surface-variant whitespace-nowrap">@hp.SoLuongDangKy SV · @(hp.LaThucHanh ? "TH" : "LT")</span>
+          </label>
+        }
+        @if (!hocPhans.Any())
+        {
+          <p class="text-sm text-on-surface-variant">Chưa có học phần. Hãy nhập hoặc thêm học phần trước.</p>
+        }
+      </div>
+    </div>
+  </div>
+
+  <div class="flex flex-wrap gap-2 mt-space-lg">
+    <button type="submit" class="px-4 py-2 rounded-lg bg-tertiary text-on-tertiary font-semibold text-sm">
+      <span class="material-symbols-outlined text-[18px] align-middle">auto_awesome</span> Chạy xếp lịch
+    </button>
+    <a href="/HocPhan/Import" class="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-surface-container text-on-surface font-semibold text-sm">
+      <span class="material-symbols-outlined text-[18px]">upload_file</span> Nhập học phần từ Excel
+    </a>
+    <a href="/LichHoc" class="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-surface-container text-on-surface font-semibold text-sm">
+      <span class="material-symbols-outlined text-[18px]">close</span> Hủy / Quay về TKB tuần
+    </a>
+  </div>
+</form>
+
+@{
+  var importErrors = TempData["ImportErrors"] as List<ImportRowError>;
+}
+@if (importErrors is { Count: > 0 })
+{
+  <div class="bg-surface-container-lowest rounded-xl shadow-sm overflow-x-auto mb-space-lg">
+    <div class="p-space-lg font-semibold text-error">Lỗi khi nhập Excel (@importErrors.Count dòng)</div>
+    <table class="w-full text-sm">
+      <thead class="bg-surface-container text-left"><tr><th class="p-3">Dòng</th><th class="p-3">Nội dung lỗi</th></tr></thead>
+      <tbody>
+      @foreach (var e in importErrors)
+      {
+        <tr class="border-t border-surface-container">
+          <td class="p-3 font-mono">@e.Row</td>
+          <td class="p-3 text-on-surface-variant">@e.Message</td>
+        </tr>
+      }
+      </tbody>
+    </table>
+  </div>
+}
+
+@if (daChay)
+{
+  <section class="space-y-space-md">
+    <div class="rounded-xl p-space-lg shadow-sm @(ketQua!.Success ? "bg-tertiary-container/10 text-tertiary" : "bg-error-container text-on-error-container")">
+      <div class="font-semibold">@ketQua.Message</div>
+      <div class="text-sm mt-1 opacity-80">Duyệt @ketQua.NodesExplored nút · @Math.Round(ketQua.ElapsedMs, 1) ms</div>
+    </div>
+
+    @if (assigned.Count > 0)
+    {
+      <div class="bg-surface-container-lowest rounded-xl shadow-sm overflow-x-auto">
+        <div class="p-space-lg flex flex-wrap items-center justify-between gap-2">
+          <div class="font-semibold">Thời khóa biểu đã xếp (@assigned.Count lớp)</div>
+          <form asp-action="ExportAutoSchedule" method="post">
+            @Html.AntiForgeryToken()
+            <input type="hidden" name="data" value="@System.Text.Json.JsonSerializer.Serialize(assigned)" />
+            <button type="submit" class="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-tertiary text-on-tertiary font-semibold text-sm">
+              <span class="material-symbols-outlined text-[18px]">download</span> Xuất Excel
+            </button>
+          </form>
+        </div>
+        <table class="w-full text-sm border-collapse">
+          <thead>
+            <tr class="bg-surface-container text-left">
+              <th class="p-2 border border-surface-container whitespace-nowrap">Ca / Ngày</th>
+              @foreach (var ngay in ngayTkb)
+              {
+                <th class="p-2 border border-surface-container text-center whitespace-nowrap">
+                  <div class="font-semibold">@ngay.ToString("dd/MM/yyyy")</div>
+                  <div class="text-xs text-on-surface-variant">@TenThu(ngay)</div>
+                </th>
+              }
+            </tr>
+          </thead>
+          <tbody>
+            @foreach (var ca in caTkb)
+            {
+              <tr>
+                <td class="p-2 border border-surface-container align-top whitespace-nowrap">
+                  <div class="font-semibold">@ca.Label</div>
+                  <div class="text-xs font-mono text-on-surface-variant">@ca.TimeRange</div>
+                </td>
+                @foreach (var ngay in ngayTkb)
+                {
+                  var o = assigned.Where(x => x.CaHoc == ca.Code && x.NgayHoc == ngay).ToList();
+                  <td class="p-1 border border-surface-container align-top" style="min-width:170px">
+                    @foreach (var it in o)
+                    {
+                      <div class="rounded bg-primary-container/10 p-1.5 mb-1 text-xs">
+                        <div class="font-semibold">@it.TenHocPhan</div>
+                        <div class="text-on-surface-variant">@it.CodePhong · @it.SoTiet tiết</div>
+                        <div class="text-on-surface-variant">@(string.IsNullOrWhiteSpace(it.TenGiangVien) ? it.MaGiangVien : it.TenGiangVien)</div>
+                      </div>
+                    }
+                  </td>
+                }
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    }
+
+    @if (ketQua.Failed.Count > 0)
+    {
+      <div class="bg-surface-container-lowest rounded-xl shadow-sm overflow-x-auto">
+        <div class="p-space-lg font-semibold text-error">Không xếp được @ketQua.Failed.Count lớp</div>
+        <table class="w-full text-sm">
+          <thead class="bg-surface-container text-left"><tr><th class="p-3">Mã học phần</th><th class="p-3">Tên học phần</th><th class="p-3">Lý do</th></tr></thead>
+          <tbody>
+          @foreach (var f in ketQua.Failed)
+          {
+            <tr class="border-t border-surface-container">
+              <td class="p-3 font-mono text-primary">@f.MaHocPhan</td>
+              <td class="p-3">@f.TenHocPhan</td>
+              <td class="p-3 text-error">@f.Reason</td>
+            </tr>
+          }
+          </tbody>
+        </table>
+      </div>
+    }
+
+    @if (ketQua.Skipped.Count > 0)
+    {
+      <div class="bg-surface-container-lowest rounded-xl shadow-sm p-space-lg">
+        <div class="font-semibold mb-2">Bỏ qua (đã có lịch)</div>
+        <ul class="text-sm text-on-surface-variant list-disc pl-5 space-y-1">
+          @foreach (var s in ketQua.Skipped) { <li>@s</li> }
+        </ul>
+      </div>
+    }
+  </section>
+}
+
+@section Scripts {
+<script>
+  var all = document.getElementById('chkAll');
+  if (all) {
+    all.addEventListener('change', function () {
+      document.querySelectorAll('.chk-hp').forEach(function (c) { c.checked = all.checked; });
+    });
+  }
+</script>
+}

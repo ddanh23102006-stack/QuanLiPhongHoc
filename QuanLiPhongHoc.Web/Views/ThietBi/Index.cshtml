@@ -1,0 +1,82 @@
+@model IEnumerable<ThietBi>
+@{
+    ViewData["Title"] = "Thiết bị CSVC";
+    var thongKe = ViewBag.ThongKe as Dictionary<int, ThietBiStatDto> ?? new();
+    var loai = ViewBag.Loai as string;
+}
+<div class="flex flex-wrap items-center justify-between gap-space-md mb-space-md">
+  <div>
+    <div class="text-xs text-on-surface-variant">CSVC / <span class="text-primary font-bold">Thiết bị</span></div>
+    <h1 class="text-xl font-bold">Danh mục thiết bị cơ sở vật chất</h1>
+  </div>
+  <a class="flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-primary-container text-on-primary font-semibold text-sm shadow-sm transition-all active:scale-[0.98]" href="/ThietBi/Create">
+    <span class="material-symbols-outlined text-[18px]">add</span>
+    <span>Thêm loại thiết bị</span>
+  </a>
+</div>
+
+<form class="flex flex-wrap gap-2 mb-space-md bg-surface-container-lowest p-space-md rounded-xl" method="get">
+  <input name="q" value="@ViewBag.Q" placeholder="Tên hoặc mã thiết bị" class="rounded-lg bg-surface-container-low px-3 py-2 text-sm flex-1 max-w-xs" />
+  <select name="loai" class="rounded-lg bg-surface-container-low px-3 py-2 text-sm">
+    <option value="">Tất cả loại phòng</option>
+    @foreach (var kv in Catalogs.LoaiPhong)
+    {
+      <option value="@kv.Key" selected="@(loai == kv.Key)">@kv.Value</option>
+    }
+  </select>
+  <button class="px-3 py-2 bg-primary text-on-primary rounded-lg text-sm">Lọc</button>
+</form>
+
+<div class="bg-surface-container-lowest rounded-xl shadow-sm overflow-hidden">
+<div class="overflow-x-auto">
+<table class="w-full text-sm">
+  <thead class="bg-surface-container text-left">
+    <tr>
+      <th class="p-3">Mã thiết bị</th>
+      <th class="p-3">Tên thiết bị</th>
+      <th class="p-3">Loại phòng áp dụng</th>
+      <th class="p-3">Đang phân bổ</th>
+      <th class="p-3">Trong kho</th>
+      <th class="p-3">Cần xử lý</th>
+      <th class="p-3"></th>
+    </tr>
+  </thead>
+  <tbody>
+  @foreach (var tb in Model)
+  {
+    var stat = thongKe.TryGetValue(tb.MaThietBi, out var s) ? s : new ThietBiStatDto();
+    <tr class="border-t border-surface-container hover:bg-surface-container-low">
+      <td class="p-3 font-mono text-xs">@(tb.MaCodeThietBi ?? "—")</td>
+      <td class="p-3 font-semibold">@tb.TenThietBi</td>
+      <td class="p-3">@(string.IsNullOrEmpty(tb.LoaiPhong) ? "Mọi loại phòng" : Catalogs.LabelLoaiPhong(tb.LoaiPhong))</td>
+      <td class="p-3 font-mono">@stat.Tong</td>
+      <td class="p-3 font-mono @(stat.Kho > 0 ? "text-primary font-bold" : "")">@stat.Kho</td>
+      <td class="p-3 font-mono @(stat.Hong > 0 ? "text-error font-bold" : "")">@stat.Hong</td>
+      <td class="p-3 whitespace-nowrap">
+        <div class="flex items-center justify-center gap-1">
+          <a href="/ThietBi/Details/@tb.MaThietBi" title="Xem chi tiết" class="p-1.5 text-secondary hover:bg-surface-container rounded transition-colors">
+            <span class="material-symbols-outlined text-[18px]">visibility</span>
+          </a>
+          <a href="@Url.Action("Edit", "ThietBi", new { id = tb.MaThietBi, returnUrl = Context.Request.Path.ToString() + Context.Request.QueryString.ToString() })" title="Chỉnh sửa" class="p-1.5 text-primary hover:bg-surface-container rounded transition-colors">
+            <span class="material-symbols-outlined text-[18px]">edit</span>
+          </a>
+          <form asp-action="Delete" asp-route-id="@tb.MaThietBi" method="post" class="inline" onsubmit="return confirm('Xóa loại thiết bị này? Các bản ghi đang trong kho cũng sẽ bị xóa.');">
+            <button type="submit" title="Xóa" class="p-1.5 text-error hover:bg-error-container/30 rounded transition-colors cursor-pointer">
+              <span class="material-symbols-outlined text-[18px]">delete</span>
+            </button>
+          </form>
+        </div>
+      </td>
+    </tr>
+  }
+  @if (!Model.Any())
+  {
+    <tr><td colspan="7" class="p-6 text-center text-on-surface-variant">Chưa có thiết bị nào.</td></tr>
+  }
+  </tbody>
+</table>
+</div>
+<div class="border-t border-outline-variant/60">
+  @await Html.PartialAsync("_PhanTrang", (PhanTrangVm)ViewBag.PhanTrang)
+</div>
+</div>

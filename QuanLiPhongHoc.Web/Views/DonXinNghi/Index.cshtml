@@ -1,0 +1,376 @@
+@model IEnumerable<DonXinNghi>
+@{
+    ViewData["Title"] = " Đơn báo nghỉ";
+    var isTraining = User.IsInRole(AppRoles.Training);
+    var canCreate = User.IsInRole(AppRoles.Lecturer);
+    var pendingCount = (int)(ViewBag.PendingCount ?? 0);
+    var approvedCount = (int)(ViewBag.ApprovedCount ?? 0);
+    var schedules = ViewBag.Schedules as Dictionary<string, List<LichHoc>> ?? new();
+    var statusFilter = ViewBag.TrangThai as string;
+    var planFilter = ViewBag.PhuongAn as string;
+    var qFilter = ViewBag.Q as string;
+    var sort = ViewBag.Sort as string ?? "newest";
+    var dateFilter = ViewBag.Ngay as DateOnly?;
+    var today = DateOnly.FromDateTime(DateTime.Today);
+    var listCount = Model.Count();
+
+    string DayName(DayOfWeek d) => d switch
+    {
+        DayOfWeek.Monday => "Thứ Hai",
+        DayOfWeek.Tuesday => "Thứ Ba",
+        DayOfWeek.Wednesday => "Thứ Tư",
+        DayOfWeek.Thursday => "Thứ Năm",
+        DayOfWeek.Friday => "Thứ Sáu",
+        DayOfWeek.Saturday => "Thứ Bảy",
+        _ => "Chủ Nhật"
+    };
+    string StatusLabel(string? s) => s switch
+    {
+        "PENDING" => "Chờ duyệt",
+        "APPROVED" => "Đã duyệt",
+        "REJECTED" => "Từ chối",
+        _ => s ?? ""
+    };
+    string StatusPill(string? s) => s switch
+    {
+        "PENDING" => "bg-[#fff3cd] text-[#8a5a00]",
+        "APPROVED" => "bg-tertiary-container/15 text-tertiary",
+        "REJECTED" => "bg-error-container text-on-error-container",
+        _ => "bg-surface-container text-on-surface-variant"
+    };
+    string TimeAgo(DateTime t)
+    {
+        var span = DateTime.Now - t;
+        if (span.TotalMinutes < 1) return "Vừa xong";
+        if (span.TotalHours < 1) return $"{(int)span.TotalMinutes} phút trước";
+        if (span.TotalDays < 1) return $"{(int)span.TotalHours} giờ trước";
+        return $"{(int)span.TotalDays} ngày trước";
+    }
+    string Initials(string? name)
+    {
+        var parts = (name ?? "?").Split(' ', StringSplitOptions.RemoveEmptyEntries)
+            .Where(p => !p.EndsWith(".")).ToArray();
+        if (parts.Length == 0) return "?";
+        if (parts.Length == 1) return parts[0][..Math.Min(2, parts[0].Length)].ToUpper();
+        return (parts[^2][0].ToString() + parts[^1][0]).ToUpper();
+    }
+    LichHoc? RelevantSchedule(DonXinNghi d)
+    {
+        if (d.MaHocPhan is null || !schedules.TryGetValue(d.MaHocPhan, out var items) || items.Count == 0) return null;
+        return items.FirstOrDefault(x => x.NgayHoc >= today) ?? items[0];
+    }
+    string ScheduleText(LichHoc? lich) => lich is null
+        ? "Chưa có lịch cụ thể"
+        : $"{DayName(lich.NgayHoc.DayOfWeek)}, {lich.NgayHoc:dd/MM/yyyy} • {Catalogs.LabelCa(lich.CaHoc)} ({Catalogs.CaTimeRange(lich.CaHoc)}) • Phòng {lich.PhongHoc?.CodePhong}";
+}
+
+<div class="flex flex-col gap-4">
+    <!-- Header banner -->
+    <section class="bg-surface-container-lowest border border-surface-container rounded-xl shadow-sm p-4 md:p-5 flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+        <div class="flex items-start gap-3">
+            <div class="w-12 h-12 rounded-xl bg-primary-container text-on-primary flex items-center justify-center shrink-0">
+                <span class="material-symbols-outlined text-[26px]">assignment_turned_in</span>
+            </div>
+            <div>
+                <h1 class="font-headline-md text-headline-md font-bold text-on-surface uppercase tracking-wide"> Đơn báo nghỉ &amp; xếp bù giảng viên</h1>
+                <p class="font-body-sm text-body-sm text-on-surface-variant mt-1 max-w-2xl">
+                    Xử lý hồ sơ xin nghỉ dạy, bố trí ca dạy bù, cử giảng viên dạy thay và cập nhật tức thời thời khóa biểu toàn trường.
+                </p>
+            </div>
+        </div>
+        <div class="flex flex-wrap items-center gap-2 shrink-0">
+            <div class="px-4 py-2 rounded-lg bg-error-container/50 border border-error/20">
+                <div class="flex items-center gap-1.5 text-error font-bold text-headline-sm">
+                    <span class="material-symbols-outlined text-[18px]">pending_actions</span>
+                    @pendingCount đơn chờ duyệt
+                </div>
+                <div class="text-[10px] text-on-error-container/80 mt-0.5">Cần Ban Đào tạo xử lý</div>
+            </div>
+            <div class="px-4 py-2 rounded-lg bg-tertiary-container/10 border border-tertiary/20">
+                <div class="flex items-center gap-1.5 text-tertiary font-bold text-headline-sm">
+                    <span class="material-symbols-outlined text-[18px]">check_circle</span>
+                    @approvedCount đơn đã duyệt
+                </div>
+                <div class="text-[10px] text-on-surface-variant mt-0.5">Trong học kỳ hiện tại</div>
+            </div>
+            @if (canCreate)
+            {
+                <a href="/DonXinNghi/Create" class="px-3 py-2.5 rounded-lg bg-primary text-on-primary text-sm font-semibold hover:brightness-110">+ Gửi đơn</a>
+            }
+        </div>
+    </section>
+
+    <!-- Filters -->
+    <form method="get" class="bg-surface-container-lowest border border-surface-container rounded-xl shadow-sm p-3 grid grid-cols-1 md:grid-cols-12 gap-2 items-end">
+        <label class="md:col-span-3 block text-[11px] text-on-surface-variant">
+            Tìm kiếm
+            <div class="relative mt-0.5">
+                <span class="material-symbols-outlined absolute left-2 top-1/2 -translate-y-1/2 text-[16px] text-on-surface-variant">search</span>
+                <input name="q" value="@qFilter" placeholder="Mã đơn, tên giảng viên, học phần…"
+                       class="w-full rounded-lg border border-outline-variant bg-surface-container-low pl-8 pr-2 py-2 text-xs text-on-surface" />
+            </div>
+        </label>
+        <label class="md:col-span-2 block text-[11px] text-on-surface-variant">
+            Phương án
+            <select name="phuongAn" class="mt-0.5 w-full rounded-lg border border-outline-variant bg-surface-container-low px-2 py-2 text-xs">
+                <option value="ALL" selected="@(string.IsNullOrEmpty(planFilter) || planFilter == "ALL" ? "selected" : null)">Tất cả phương án</option>
+                <option value="MAKEUP_CLASS" selected="@(planFilter == "MAKEUP_CLASS" ? "selected" : null)">Dạy bù</option>
+                <option value="SUBSTITUTE_TEACHER" selected="@(planFilter == "SUBSTITUTE_TEACHER" ? "selected" : null)">Giảng viên dạy thay</option>
+            </select>
+        </label>
+        <label class="md:col-span-2 block text-[11px] text-on-surface-variant">
+            Trạng thái
+            <select name="trangThai" class="mt-0.5 w-full rounded-lg border border-outline-variant bg-surface-container-low px-2 py-2 text-xs">
+                @if (!isTraining)
+                {
+                    <option value="ALL" selected="@(string.IsNullOrEmpty(statusFilter) || statusFilter == "ALL" ? "selected" : null)">Tất cả trạng thái</option>
+                }
+                @if (isTraining)
+                {
+                    <option value="PENDING" selected="@(statusFilter == "PENDING" || string.IsNullOrEmpty(statusFilter) ? "selected" : null)">Chờ duyệt (@pendingCount)</option>
+                }
+                <option value="APPROVED" selected="@(statusFilter == "APPROVED" ? "selected" : null)">Đã duyệt</option>
+                <option value="REJECTED" selected="@(statusFilter == "REJECTED" ? "selected" : null)">Từ chối</option>
+                @if (isTraining)
+                {
+                    <option value="ALL" selected="@(statusFilter == "ALL" ? "selected" : null)">Tất cả trạng thái</option>
+                }
+            </select>
+        </label>
+        <label class="md:col-span-2 block text-[11px] text-on-surface-variant">
+            Ngày gửi
+            <input type="date" name="ngay" value="@(dateFilter?.ToString("yyyy-MM-dd"))"
+                   class="mt-0.5 w-full rounded-lg border border-outline-variant bg-surface-container-low px-2 py-2 text-xs" />
+        </label>
+        <div class="md:col-span-2 flex gap-1.5">
+            <button class="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg bg-primary text-on-primary text-xs font-semibold">
+                <span class="material-symbols-outlined text-[16px]">filter_alt</span> Lọc
+            </button>
+            <a href="/DonXinNghi" class="px-2.5 py-2 rounded-lg border border-outline-variant text-on-surface-variant hover:text-primary" title="Xóa bộ lọc">
+                <span class="material-symbols-outlined text-[16px]">restart_alt</span>
+            </a>
+        </div>
+    </form>
+
+    <!-- List header -->
+    <div class="flex flex-wrap items-center justify-between gap-2 px-1">
+        <div class="flex flex-wrap items-center gap-2">
+            <h2 class="font-headline-sm text-headline-sm font-bold text-on-surface uppercase tracking-wide">Danh sách đơn báo nghỉ</h2>
+            @if (pendingCount > 0)
+            {
+                <span class="px-2 py-0.5 rounded-full bg-error-container text-on-error-container text-[11px] font-bold">@pendingCount đơn đang chờ duyệt</span>
+            }
+        </div>
+        <div class="flex items-center gap-2 text-[11px] text-on-surface-variant">
+            <span>Hiển thị @listCount/@listCount đơn</span>
+            <span>•</span>
+            <form method="get" class="flex items-center">
+                <input type="hidden" name="q" value="@qFilter" />
+                <input type="hidden" name="trangThai" value="@statusFilter" />
+                <input type="hidden" name="phuongAn" value="@planFilter" />
+                <input type="hidden" name="ngay" value="@(dateFilter?.ToString("yyyy-MM-dd"))" />
+                <select name="sort" onchange="this.form.submit()"
+                        class="rounded border border-outline-variant bg-surface-container-lowest px-1.5 py-1 text-[11px]">
+                    <option value="newest" selected="@(sort != "oldest" ? "selected" : null)">Sắp xếp: Mới nhất</option>
+                    <option value="oldest" selected="@(sort == "oldest" ? "selected" : null)">Sắp xếp: Cũ nhất</option>
+                </select>
+            </form>
+        </div>
+    </div>
+
+    @if (listCount == 0)
+    {
+        <div class="bg-surface-container-lowest border border-dashed border-outline-variant rounded-xl p-10 text-center text-on-surface-variant">
+            <span class="material-symbols-outlined text-[40px] text-outline">inbox</span>
+            <p class="mt-2 text-sm">Không có đơn nào phù hợp bộ lọc hiện tại.</p>
+        </div>
+    }
+
+    @foreach (var d in Model)
+    {
+        var lich = RelevantSchedule(d);
+        var isPending = d.TrangThai == "PENDING";
+        var plan = d.PhuongAnGiaiQuyet;
+        var planLabel = Catalogs.LabelPhuongAn(plan);
+        <article class="bg-surface-container-lowest border border-surface-container rounded-xl shadow-sm p-4">
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-3 lg:items-center">
+                <!-- Meta -->
+                <div class="lg:col-span-2 border-l-2 border-surface-container pl-3">
+                    <div class="font-mono text-xs font-bold text-primary">#BN-@d.NgayTao.Year-@d.MaDon.ToString("D4")</div>
+                    <div class="flex items-center gap-1 text-[11px] text-on-surface-variant mt-1">
+                        <span class="material-symbols-outlined text-[13px]">schedule</span> @TimeAgo(d.NgayTao)
+                    </div>
+                    <span class="inline-flex items-center gap-1 mt-1.5 px-2 py-0.5 rounded-full text-[10px] font-bold @StatusPill(d.TrangThai)">
+                        <span class="material-symbols-outlined text-[12px]">@(isPending ? "hourglass_top" : d.TrangThai == "APPROVED" ? "check_circle" : "cancel")</span>
+                        @StatusLabel(d.TrangThai)
+                    </span>
+                </div>
+
+                <!-- Lecturer + course -->
+                <div class="lg:col-span-4 flex items-start gap-3 lg:border-l border-surface-container lg:pl-3">
+                    <div class="w-10 h-10 rounded-lg bg-surface-container text-primary font-bold text-sm flex items-center justify-center shrink-0">@Initials(d.GiangVien?.HoTen)</div>
+                    <div class="min-w-0 flex-1">
+                        <div class="flex flex-wrap items-center gap-1.5">
+                            <span class="font-bold text-sm text-on-surface">@d.GiangVien?.HoTen</span>
+                            <span class="font-mono text-[10px] px-1.5 py-0.5 rounded bg-surface-container text-on-surface-variant">@d.MaGiangVien</span>
+                        </div>
+                        <div class="text-[11px] text-on-surface-variant">Giảng viên · Ban Quản lý Đào tạo</div>
+                        <div class="mt-1.5 rounded-lg bg-surface-container-low px-2.5 py-1.5 text-[11px]">
+                            <div class="font-semibold text-on-surface truncate">@d.HocPhan?.TenHocPhan</div>
+                            <div class="text-on-surface-variant">Mã HP: @d.MaHocPhan · @d.HocPhan?.SoLuongDangKy SV</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Schedule + plan -->
+                <div class="lg:col-span-3 space-y-1.5">
+                    <div class="rounded-lg bg-error-container/40 border border-error/15 px-3 py-2 text-[11px]">
+                        <div class="font-bold text-error flex items-center gap-1">
+                            <span class="material-symbols-outlined text-[14px]">event_busy</span> Lịch xin nghỉ
+                        </div>
+                        <div class="text-on-surface-variant mt-0.5 leading-snug">@ScheduleText(lich)</div>
+                    </div>
+                    @if (plan.StartsWith("SUBSTITUTE"))
+                    {
+                        <div class="rounded-lg bg-surface-container border border-outline-variant px-3 py-2 text-[11px]">
+                            <div class="font-bold text-primary flex items-center gap-1">
+                                <span class="material-symbols-outlined text-[14px]">swap_horiz</span> Giảng viên dạy thay
+                            </div>
+                            <div class="text-on-surface-variant mt-0.5">@(d.GiangVienDayThay?.HoTen ?? "Chưa chỉ định")</div>
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="rounded-lg bg-tertiary-container/10 border border-tertiary/20 px-3 py-2 text-[11px]">
+                            <div class="font-bold text-tertiary flex items-center gap-1">
+                                <span class="material-symbols-outlined text-[14px]">event_repeat</span> @planLabel
+                            </div>
+                            <div class="text-on-surface-variant mt-0.5">Hủy ca hiện tại và bố trí lịch bù sau khi duyệt</div>
+                        </div>
+                    }
+                </div>
+
+                <!-- Action -->
+                <div class="lg:col-span-3 flex lg:justify-end">
+                    <button type="button"
+                            class="w-full lg:w-auto px-4 py-2.5 rounded-lg bg-primary text-on-primary text-sm font-bold flex items-center justify-center gap-2 hover:brightness-110 transition-all"
+                            onclick="openDonModal(this)"
+                            data-id="@d.MaDon"
+                            data-code="#BN-@d.NgayTao.Year-@d.MaDon.ToString("D4")"
+                            data-lecturer="@d.GiangVien?.HoTen"
+                            data-lecturer-code="@d.MaGiangVien"
+                            data-course="@d.HocPhan?.TenHocPhan"
+                            data-reason="@d.LyDo"
+                            data-plan="@planLabel"
+                            data-substitute="@d.GiangVienDayThay?.HoTen"
+                            data-status="@StatusLabel(d.TrangThai)"
+                            data-created="@d.NgayTao.ToString("dd/MM/yyyy HH:mm")"
+                            data-schedule="@ScheduleText(lich)"
+                            data-pending="@(isPending ? "true" : "false")"
+                            data-can-approve="@(isTraining ? "true" : "false")">
+                        <span class="material-symbols-outlined text-[18px]">visibility</span>
+                        @(isPending && isTraining ? "Xem chi tiết & Phê duyệt" : "Xem chi tiết")
+                    </button>
+                </div>
+            </div>
+
+            <div class="mt-3 border-l-4 border-outline-variant bg-surface-container-low/50 px-3 py-1.5 text-[11px] text-on-surface-variant">
+                <span class="font-semibold text-on-surface">Lý do:</span> <span class="italic">"@d.LyDo"</span>
+            </div>
+        </article>
+    }
+</div>
+
+<!-- Detail modal -->
+<dialog id="donModal" class="rounded-xl p-0 w-[min(640px,94vw)] backdrop:bg-black/40">
+    <div class="flex items-center justify-between px-4 py-3 border-b border-surface-container bg-surface-container-lowest">
+        <div>
+            <h2 class="font-headline-sm text-headline-sm font-bold text-on-surface">Chi tiết đơn báo nghỉ</h2>
+            <div id="modalCode" class="font-mono text-[11px] text-primary"></div>
+        </div>
+        <button type="button" onclick="document.getElementById('donModal').close()" class="p-1 rounded hover:bg-surface-container">
+            <span class="material-symbols-outlined text-[20px]">close</span>
+        </button>
+    </div>
+    <div class="p-4 space-y-3 bg-surface-container-lowest">
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
+            <div>
+                <div class="text-[11px] text-on-surface-variant">Giảng viên</div>
+                <div id="modalLecturer" class="font-semibold"></div>
+                <div id="modalLecturerCode" class="font-mono text-[11px] text-on-surface-variant"></div>
+            </div>
+            <div>
+                <div class="text-[11px] text-on-surface-variant">Học phần</div>
+                <div id="modalCourse" class="font-semibold"></div>
+            </div>
+            <div>
+                <div class="text-[11px] text-on-surface-variant">Ngày gửi</div>
+                <div id="modalCreated" class="font-semibold"></div>
+            </div>
+            <div>
+                <div class="text-[11px] text-on-surface-variant">Trạng thái</div>
+                <div id="modalStatus" class="font-semibold"></div>
+            </div>
+        </div>
+        <div class="rounded-lg bg-error-container/40 border border-error/15 px-3 py-2 text-[12px]">
+            <div class="font-bold text-error">Lịch xin nghỉ</div>
+            <div id="modalSchedule" class="text-on-surface-variant"></div>
+        </div>
+        <div class="rounded-lg bg-surface-container px-3 py-2 text-[12px]">
+            <div class="font-bold text-primary">Phương án xử lý</div>
+            <div id="modalPlan" class="text-on-surface-variant"></div>
+            <div id="modalSubstitute" class="text-on-surface mt-0.5"></div>
+        </div>
+        <div class="rounded-lg bg-surface-container-low px-3 py-2 text-[12px]">
+            <div class="font-bold text-on-surface">Lý do</div>
+            <div id="modalReason" class="text-on-surface-variant italic"></div>
+        </div>
+        <div id="modalActions" class="hidden flex-col sm:flex-row gap-2 pt-1 border-t border-surface-container">
+            <form asp-action="Approve" method="post" class="flex-1">
+                <input type="hidden" name="id" id="approveId" />
+                <button class="w-full px-4 py-2.5 rounded-lg bg-tertiary text-on-tertiary text-sm font-bold hover:brightness-110 flex items-center justify-center gap-2">
+                    <span class="material-symbols-outlined text-[18px]">check_circle</span> Phê duyệt đơn
+                </button>
+            </form>
+            <form asp-action="Reject" method="post" class="flex-1">
+                <input type="hidden" name="id" id="rejectId" />
+                <button class="w-full px-4 py-2.5 rounded-lg border border-error text-error text-sm font-bold hover:bg-error-container/40 flex items-center justify-center gap-2">
+                    <span class="material-symbols-outlined text-[18px]">cancel</span> Từ chối
+                </button>
+            </form>
+        </div>
+        <p id="modalNote" class="hidden text-[11px] text-on-surface-variant text-center">Đơn này không ở trạng thái chờ duyệt hoặc bạn không có quyền xử lý.</p>
+    </div>
+</dialog>
+
+<script>
+    (function () {
+        var modal = document.getElementById('donModal');
+        function setText(id, value) {
+            var el = document.getElementById(id);
+            if (el) el.textContent = value || '—';
+        }
+        window.openDonModal = function (btn) {
+            var d = btn.dataset;
+            setText('modalCode', d.code);
+            setText('modalLecturer', d.lecturer);
+            setText('modalLecturerCode', d.lecturerCode);
+            setText('modalCourse', d.course);
+            setText('modalCreated', d.created);
+            setText('modalStatus', d.status);
+            setText('modalSchedule', d.schedule);
+            setText('modalPlan', d.plan);
+            var sub = document.getElementById('modalSubstitute');
+            sub.textContent = d.substitute ? 'GV dạy thay: ' + d.substitute : '';
+            sub.classList.toggle('hidden', !d.substitute);
+            setText('modalReason', '"' + (d.reason || '') + '"');
+            document.getElementById('approveId').value = d.id;
+            document.getElementById('rejectId').value = d.id;
+            var canAct = d.canApprove === 'true' && d.pending === 'true';
+            document.getElementById('modalActions').classList.toggle('hidden', !canAct);
+            document.getElementById('modalActions').classList.toggle('flex', canAct);
+            document.getElementById('modalNote').classList.toggle('hidden', canAct);
+            modal.showModal();
+        };
+    })();
+</script>

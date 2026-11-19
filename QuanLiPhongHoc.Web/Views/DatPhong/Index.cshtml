@@ -1,0 +1,483 @@
+@using System.Security.Claims
+@model IEnumerable<DatPhong>
+@{
+    ViewData["Title"] = User.IsInRole(AppRoles.Facility) ? "Duyệt đơn mượn phòng" : "Phiếu đăng ký mượn phòng";
+    var laFacility = User.IsInRole(AppRoles.Facility);
+    var uid = User.FindFirstValue(ClaimTypes.NameIdentifier);
+    var page = ViewBag.Page is int pt ? pt : 1;
+    var soTrang = ViewBag.SoTrang is int st ? st : 1;
+    var tongSo = ViewBag.TongSo is int ts ? ts : Model.Count();
+    var tuKhoa = ViewBag.Q as string;
+    var ttDangLoc = ViewBag.TrangThai as string;
+    var toaDangLoc = ViewBag.Toa as int?;
+    var soChoDuyet = ViewBag.SoChoDuyet as int? ?? 0;
+    var dsToa = ViewBag.DanhSachToa as List<ToaNha> ?? new List<ToaNha>();
+    string Trang(int p) => Url.Action("Index", new { page = p, q = tuKhoa, tt = ttDangLoc, toa = toaDangLoc }) ?? "/DatPhong";
+    var mauTrangThai = new Dictionary<string, string>
+    {
+        ["PENDING"] = "text-amber-700 bg-amber-50 border-amber-300",
+        ["APPROVED"] = "text-tertiary bg-emerald-50 border-tertiary-fixed",
+        ["REJECTED"] = "text-error bg-red-50 border-error/30",
+        ["CANCELLED"] = "text-on-surface-variant bg-surface-container border-outline-variant"
+    };
+    var thuTrongTuan = new[] { "CN", "T2", "T3", "T4", "T5", "T6", "T7" };
+    string VaiTro(NguoiDung? nd)
+    {
+        var ma = nd?.NguoiDungVaiTros.Select(x => x.VaiTro?.CodeVaiTro).ToList() ?? new List<string?>();
+        if (ma.Contains(AppRoles.Lecturer)) return "Giảng viên";
+        if (ma.Contains(AppRoles.Student)) return "Sinh viên";
+        return "Người dùng";
+    }
+}
+
+<nav class="flex items-center gap-1.5 text-body-sm font-body-sm text-secondary mb-3">
+    <span class="material-symbols-outlined text-[16px]">home</span>
+    <a href="/Home" class="hover:text-primary">Trang chủ</a>
+    <span class="text-outline">/</span>
+    <span class="text-primary font-semibold">@(laFacility ? "Duyệt đơn mượn phòng" : "Phiếu đăng ký mượn phòng")</span>
+</nav>
+
+<section class="pb-3 border-b border-surface-container mb-4 flex flex-col md:flex-row md:items-center justify-between gap-3">
+    <div class="flex items-start gap-3">
+        <div class="w-10 h-10 rounded-lg bg-secondary-container text-primary flex items-center justify-center flex-shrink-0">
+            <span class="material-symbols-outlined">verified</span>
+        </div>
+        <div>
+            <h1 class="font-headline-lg text-headline-lg font-bold text-primary uppercase tracking-tight">
+                @(laFacility ? "Duyệt đơn mượn phòng" : "Phiếu đăng ký mượn phòng")
+            </h1>
+            <p class="font-body-sm text-body-sm text-on-surface-variant mt-0.5">
+                @(laFacility
+                    ? "Tiếp nhận, thẩm định và phê duyệt yêu cầu mượn phòng học của sinh viên, giảng viên."
+                    : "Theo dõi trạng thái xét duyệt và rút phiếu khi không còn nhu cầu.")
+            </p>
+        </div>
+    </div>
+    @if (!laFacility)
+    {
+        <a href="/DatPhong/Create" class="shrink-0 self-center inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary text-on-primary hover:bg-primary-container font-label-md text-label-md font-semibold transition-colors">
+            <span class="material-symbols-outlined text-[18px]">post_add</span>
+            <span>Lập phiếu mới</span>
+        </a>
+    }
+</section>
+
+@if (laFacility)
+{
+    <form method="get" asp-action="Index" class="bg-surface-container-lowest border border-surface-container-highest p-3 rounded-lg shadow-sm mb-4">
+        <div class="grid grid-cols-1 md:grid-cols-12 gap-2.5 items-center">
+            <div class="md:col-span-4 relative">
+                <span class="absolute inset-y-0 left-0 pl-2.5 flex items-center pointer-events-none text-secondary">
+                    <span class="material-symbols-outlined text-[18px]">search</span>
+                </span>
+                <input name="q" value="@tuKhoa" placeholder="Tìm theo mã đơn, người gửi, MSSV, mã phòng..."
+                       class="w-full pl-8 pr-3 py-1.5 text-body-sm bg-surface border border-surface-container-highest rounded-lg focus:outline-none focus:border-primary text-on-surface" />
+            </div>
+            <div class="md:col-span-3">
+                <select name="tt" class="w-full py-1.5 px-2.5 text-body-sm bg-surface border border-surface-container-highest rounded-lg focus:outline-none focus:border-primary text-on-surface">
+                    <option value="">Trạng thái: Tất cả</option>
+                    @foreach (var kv in Catalogs.TrangThaiDatPhong)
+                    {
+                        <option value="@kv.Key" selected="@(ttDangLoc == kv.Key)">@kv.Value</option>
+                    }
+                </select>
+            </div>
+            <div class="md:col-span-3">
+                <select name="toa" class="w-full py-1.5 px-2.5 text-body-sm bg-surface border border-surface-container-highest rounded-lg focus:outline-none focus:border-primary text-on-surface">
+                    <option value="">Tất cả khu nhà</option>
+                    @foreach (var t in dsToa)
+                    {
+                        <option value="@t.MaToaNha" selected="@(toaDangLoc == t.MaToaNha)">@t.CodeToaNha — @t.TenToaNha</option>
+                    }
+                </select>
+            </div>
+            <div class="md:col-span-2 flex items-center gap-1.5">
+                <button class="w-full bg-primary hover:bg-primary-container text-on-primary py-1.5 px-3 rounded-lg flex items-center justify-center gap-1.5 font-label-md text-label-md font-semibold transition-colors">
+                    <span class="material-symbols-outlined text-[18px]">filter_alt</span>
+                    <span>Lọc đơn</span>
+                </button>
+                @if (!string.IsNullOrWhiteSpace(tuKhoa) || !string.IsNullOrWhiteSpace(ttDangLoc) || toaDangLoc != null)
+                {
+                    <a href="@Url.Action("Index")" title="Xóa bộ lọc" class="shrink-0 p-1.5 rounded-lg border border-outline-variant text-on-surface-variant hover:bg-surface-container transition-colors">
+                        <span class="material-symbols-outlined text-[18px]">filter_alt_off</span>
+                    </a>
+                }
+            </div>
+        </div>
+    </form>
+
+    <div class="flex flex-wrap items-center justify-between gap-2 px-1 pb-2">
+        <div class="flex items-center gap-2">
+            <span class="font-label-md text-label-md text-secondary uppercase font-bold">Danh sách yêu cầu mượn phòng</span>
+            @if (soChoDuyet > 0)
+            {
+                <span class="bg-error-container/60 text-error font-label-sm text-[11px] px-2 py-0.5 rounded font-bold border border-error/20">@soChoDuyet đơn đang chờ duyệt</span>
+            }
+        </div>
+        <span class="text-body-sm text-[12px] text-secondary">Hiển thị @Model.Count()/@tongSo đơn · Sắp xếp: Chờ duyệt trước</span>
+    </div>
+
+    <div class="space-y-3">
+        @if (!Model.Any())
+        {
+            <div class="bg-surface-container-lowest border border-surface-container-highest rounded-lg p-8 text-center text-on-surface-variant">
+                <span class="material-symbols-outlined text-[32px] text-outline">inbox</span>
+                <p class="font-semibold mt-1">Không có đơn mượn phòng nào khớp bộ lọc.</p>
+            </div>
+        }
+        @foreach (var d in Model)
+        {
+            var choDuyet = d.TrangThai == "PENDING";
+            var tenNguoiGui = d.NguoiYeuCauNav?.HoTen ?? d.NguoiYeuCau ?? "—";
+            var vaiTro = VaiTro(d.NguoiYeuCauNav);
+            <div class="bg-surface-container-lowest border @(choDuyet ? "border-primary/40" : "border-surface-container-highest") rounded-lg p-4 shadow-sm hover:border-primary transition-all flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+                <div class="flex-1 grid grid-cols-1 md:grid-cols-12 gap-3 items-center">
+                    <div class="md:col-span-3">
+                        <div class="flex items-center gap-2 flex-wrap">
+                            <span class="font-headline-sm text-headline-sm font-bold @(choDuyet ? "text-primary" : "text-on-surface")">#PM-@d.MaDatPhong.ToString("D5")</span>
+                            <span class="font-label-sm text-label-sm px-2 py-0.5 rounded border font-semibold @(mauTrangThai.GetValueOrDefault(d.TrangThai, "text-on-surface-variant bg-surface-container border-outline-variant"))">
+                                @Catalogs.Label(Catalogs.TrangThaiDatPhong, d.TrangThai)
+                            </span>
+                        </div>
+                        <div class="text-secondary text-[12px] mt-1 flex items-center gap-1">
+                            <span class="material-symbols-outlined text-[14px]">schedule</span>
+                            @if (d.ThoiDiemXuLy is DateTime luc)
+                            {
+                                <span>Xử lý @luc.ToString("dd/MM/yyyy HH:mm")</span>
+                            }
+                            else
+                            {
+                                <span>Đang chờ CSVC xét duyệt</span>
+                            }
+                        </div>
+                    </div>
+                    <div class="md:col-span-4 space-y-1">
+                        <div class="flex items-center gap-1.5 flex-wrap text-on-surface">
+                            <span class="material-symbols-outlined text-[16px] text-secondary">person</span>
+                            <span class="font-bold">@tenNguoiGui</span>
+                            <span class="text-secondary text-[12px]">(@vaiTro · @d.NguoiYeuCau)</span>
+                        </div>
+                        <div class="flex items-start gap-1.5 text-secondary text-[12px]">
+                            <span class="material-symbols-outlined text-[15px] mt-px">assignment</span>
+                            <span class="line-clamp-2">@(string.IsNullOrWhiteSpace(d.MucDich) ? "—" : d.MucDich)</span>
+                        </div>
+                    </div>
+                    <div class="md:col-span-5 space-y-1">
+                        <div class="flex items-center gap-1.5 flex-wrap text-on-surface">
+                            <span class="material-symbols-outlined text-[16px] text-primary">meeting_room</span>
+                            <span>Phòng: <strong class="@(choDuyet ? "text-primary" : "text-on-surface") text-body-lg">@(d.PhongHoc?.CodePhong ?? "—")</strong></span>
+                            @if (d.PhongHoc?.ToaNha != null)
+                            {
+                                <span class="text-secondary text-[12px]">(@d.PhongHoc.ToaNha.CodeToaNha)</span>
+                            }
+                            <span class="text-secondary text-xs">• @(d.SoLuongNguoiThamGia?.ToString() ?? "—") người (sức chứa @(d.PhongHoc?.SucChua.ToString() ?? "—"))</span>
+                        </div>
+                        <div class="flex items-center gap-1.5 text-secondary text-[12px]">
+                            <span class="material-symbols-outlined text-[15px]">calendar_today</span>
+                            <span>@Catalogs.MoTaKhoang(d.GioBatDau, d.GioKetThuc) • @thuTrongTuan[(int)d.NgayDat.DayOfWeek], @d.NgayDat.ToString("dd/MM/yyyy")</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="flex items-center gap-2 pt-2 lg:pt-0 border-t lg:border-t-0 border-surface-container shrink-0">
+                    <button type="button" data-mo-modal="don-@d.MaDatPhong"
+                            class="w-full lg:w-auto inline-flex items-center justify-center gap-1.5 px-4 py-2 rounded-lg font-label-md text-label-md font-semibold transition-colors @(choDuyet ? "bg-primary text-on-primary hover:bg-primary-container shadow-sm font-bold" : "bg-surface-container-lowest border border-outline-variant hover:bg-surface-container text-secondary")">
+                        <span class="material-symbols-outlined text-[18px]">@(choDuyet ? "verified" : "visibility")</span>
+                        <span>@(choDuyet ? "Xem chi tiết & Phê duyệt" : "Xem lại đơn")</span>
+                    </button>
+                </div>
+            </div>
+
+            <div id="don-@d.MaDatPhong" class="fixed inset-0 z-50 bg-inverse-surface/50 backdrop-blur-xs items-center justify-center p-3 hidden">
+                <div class="bg-surface-container-lowest w-full max-w-2xl rounded-xl shadow-2xl border border-surface-container-highest overflow-hidden max-h-[90vh] flex flex-col">
+                    <div class="bg-primary-container px-4 py-3 flex items-center justify-between text-on-primary shrink-0">
+                        <div class="flex items-center gap-2">
+                            <span class="material-symbols-outlined text-[20px]">verified</span>
+                            <h2 class="font-headline-sm text-headline-sm font-bold">Chi tiết đơn &amp; Phê duyệt mượn phòng</h2>
+                        </div>
+                        <button type="button" data-dong-modal class="text-on-primary-container hover:text-on-primary transition-colors">
+                            <span class="material-symbols-outlined">close</span>
+                        </button>
+                    </div>
+                    <div class="p-4 space-y-4 overflow-y-auto flex-1">
+                        <div class="bg-surface-container-low p-3 rounded-lg border border-surface-container-high grid grid-cols-1 md:grid-cols-2 gap-3">
+                            <div class="space-y-2">
+                                <div>
+                                    <span class="text-[11px] uppercase tracking-wider text-secondary font-bold">Mã đơn đăng ký:</span>
+                                    <div class="font-headline-sm text-headline-sm font-bold text-primary">#PM-@d.MaDatPhong.ToString("D5")</div>
+                                </div>
+                                <div>
+                                    <span class="text-[11px] uppercase tracking-wider text-secondary font-bold">Người làm đơn:</span>
+                                    <div class="font-label-md text-label-md font-bold text-on-surface">@tenNguoiGui</div>
+                                    <div class="text-body-sm text-secondary text-[12px]">@vaiTro · Mã số: @d.NguoiYeuCau</div>
+                                    <div class="text-body-sm text-secondary text-[12px]">SĐT: @(string.IsNullOrWhiteSpace(d.NguoiYeuCauNav?.SoDienThoai) ? "Chưa cập nhật" : d.NguoiYeuCauNav.SoDienThoai)</div>
+                                </div>
+                            </div>
+                            <div class="space-y-2 border-t md:border-t-0 md:border-l border-surface-container-high md:pl-3 pt-2 md:pt-0">
+                                <div>
+                                    <span class="text-[11px] uppercase tracking-wider text-secondary font-bold">Phòng &amp; Thời gian:</span>
+                                    <div class="font-label-md text-label-md font-bold text-primary">@(d.PhongHoc?.CodePhong ?? "—")@(d.PhongHoc?.ToaNha != null ? $" ({d.PhongHoc.ToaNha.CodeToaNha})" : "")</div>
+                                    <div class="text-body-sm text-on-surface text-[12px]">@Catalogs.MoTaKhoang(d.GioBatDau, d.GioKetThuc) • @thuTrongTuan[(int)d.NgayDat.DayOfWeek], @d.NgayDat.ToString("dd/MM/yyyy")</div>
+                                    <div class="text-body-sm text-secondary text-[12px]">@(d.SoLuongNguoiThamGia?.ToString() ?? "—") người tham gia · Sức chứa @(d.PhongHoc?.SucChua.ToString() ?? "—")</div>
+                                </div>
+                                <div>
+                                    <span class="text-[11px] uppercase tracking-wider text-secondary font-bold">Mục đích mượn:</span>
+                                    <div class="text-body-sm text-on-surface text-[12px]">@(string.IsNullOrWhiteSpace(d.MucDich) ? "—" : d.MucDich)</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        @if (choDuyet)
+                        {
+                            <form method="post" class="js-pheduyet-form space-y-4" data-approve="@Url.Action("Approve")" data-reject="@Url.Action("Reject")">
+                                @Html.AntiForgeryToken()
+                                <input type="hidden" name="id" value="@d.MaDatPhong" />
+                                <input type="hidden" name="page" value="@(page)" />
+                                @if (!string.IsNullOrWhiteSpace(tuKhoa))
+                                {
+                                    <input type="hidden" name="q" value="@tuKhoa" />
+                                }
+                                @if (!string.IsNullOrWhiteSpace(ttDangLoc))
+                                {
+                                    <input type="hidden" name="tt" value="@ttDangLoc" />
+                                }
+                                @if (toaDangLoc is int maToa)
+                                {
+                                    <input type="hidden" name="toa" value="@maToa" />
+                                }
+
+                                <div class="border-t border-surface-container pt-3">
+                                    <label class="block font-label-md text-label-md text-on-surface font-bold mb-1.5">Hành động quyết định:</label>
+                                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                        <label class="cursor-pointer">
+                                            <input type="radio" name="quyetDinh" value="approve" class="peer sr-only" checked />
+                                            <span class="flex items-center justify-center gap-2 p-2.5 rounded-lg border-2 border-outline-variant bg-surface text-secondary font-bold transition-all peer-checked:border-tertiary-container peer-checked:bg-emerald-50 peer-checked:text-tertiary">
+                                                <span class="material-symbols-outlined text-[20px]">check_circle</span>
+                                                <span>✓ PHÊ DUYỆT ĐƠN</span>
+                                            </span>
+                                        </label>
+                                        <label class="cursor-pointer">
+                                            <input type="radio" name="quyetDinh" value="reject" class="peer sr-only" />
+                                            <span class="flex items-center justify-center gap-2 p-2.5 rounded-lg border-2 border-outline-variant bg-surface text-secondary font-bold transition-all peer-checked:border-error peer-checked:bg-red-50 peer-checked:text-error">
+                                                <span class="material-symbols-outlined text-[20px]">cancel</span>
+                                                <span>✕ TỪ CHỐI ĐƠN</span>
+                                            </span>
+                                        </label>
+                                    </div>
+                                </div>
+                                <p class="text-[12px] text-on-surface-variant flex items-start gap-1.5">
+                                    <span class="material-symbols-outlined text-[15px] text-primary">info</span>
+                                    <span>Quyết định được lưu vào nhật ký hoạt động và gửi thông báo kết quả tới người làm đơn.</span>
+                                </p>
+                                <div class="flex flex-col sm:flex-row sm:items-center justify-end gap-2 border-t border-surface-container pt-3">
+                                    <button type="button" data-dong-modal class="px-4 py-1.5 bg-surface-container-lowest border border-outline-variant hover:bg-surface-container text-on-surface rounded-lg font-label-md text-label-md transition-colors">Hủy bỏ / Đóng</button>
+                                    <button type="submit" class="px-5 py-2 bg-primary hover:bg-primary-container text-on-primary rounded-lg font-label-md text-label-md font-bold flex items-center justify-center gap-1.5 shadow transition-all">
+                                        <span class="material-symbols-outlined text-[18px]">send</span>
+                                        <span>Xác nhận &amp; Gửi thông báo</span>
+                                    </button>
+                                </div>
+                            </form>
+                        }
+                        else
+                        {
+                            <div class="border-t border-surface-container pt-3 space-y-2">
+                                <div class="flex flex-wrap items-center gap-2">
+                                    <span class="font-label-md text-label-md text-on-surface font-bold">Kết quả xét duyệt:</span>
+                                    <span class="font-label-sm text-label-sm px-2 py-0.5 rounded border font-semibold @(mauTrangThai.GetValueOrDefault(d.TrangThai, "text-on-surface-variant bg-surface-container border-outline-variant"))">
+                                        @Catalogs.Label(Catalogs.TrangThaiDatPhong, d.TrangThai)
+                                    </span>
+                                </div>
+                                <p class="text-body-sm text-secondary text-[12px]">
+                                    Xử lý bởi @(d.NguoiDuyetNav?.HoTen ?? d.NguoiDuyet ?? "CSVC")
+                                    @if (d.ThoiDiemXuLy is DateTime lucModal)
+                                    {
+                                        <text>· @lucModal.ToString("dd/MM/yyyy HH:mm")</text>
+                                    }
+                                </p>
+                                <div class="flex justify-end border-t border-surface-container pt-3">
+                                    <button type="button" data-dong-modal class="px-4 py-1.5 bg-surface-container-lowest border border-outline-variant hover:bg-surface-container text-on-surface rounded-lg font-label-md text-label-md transition-colors">Đóng lại</button>
+                                </div>
+                            </div>
+                        }
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+
+    @if (soTrang > 1)
+    {
+        <nav class="flex items-center justify-center gap-1.5 text-sm mt-4">
+            @if (page > 1)
+            {
+                <a href="@Trang(page - 1)" class="px-3 py-1.5 rounded-lg border border-outline-variant text-on-surface-variant hover:bg-surface-container-low">‹ Trước</a>
+            }
+            @for (var p = 1; p <= soTrang; p++)
+            {
+                <a href="@Trang(p)" class="px-3 py-1.5 rounded-lg border @(p == page ? "bg-primary text-on-primary border-primary font-semibold" : "border-outline-variant text-on-surface-variant hover:bg-surface-container-low")">@p</a>
+            }
+            @if (page < soTrang)
+            {
+                <a href="@Trang(page + 1)" class="px-3 py-1.5 rounded-lg border border-outline-variant text-on-surface-variant hover:bg-surface-container-low">Sau ›</a>
+            }
+        </nav>
+    }
+}
+else
+{
+    var ketQuaXuLy = ViewBag.KetQuaXuLy as List<DatPhong> ?? new List<DatPhong>();
+    var phieuChuaXem = ViewBag.PhieuChuaXem as HashSet<int> ?? new HashSet<int>();
+    var phanTrang = new PhanTrangVm
+    {
+        Trang = page,
+        SoTrang = soTrang,
+        TongSo = tongSo,
+        KichThuoc = 15,
+        DonVi = "phiếu",
+        TaoUrl = p => $"/DatPhong?page={p}"
+    };
+
+    @if (ketQuaXuLy.Count > 0)
+    {
+        <section class="bg-surface-container-lowest border border-outline-variant rounded-lg shadow-sm mb-4 overflow-hidden">
+            <div class="px-4 py-2.5 border-b border-outline-variant/60 flex items-center gap-2 bg-surface-container-low">
+                <span class="material-symbols-outlined text-[20px] text-primary">notifications_active</span>
+                <h2 class="font-label-md text-label-md font-bold text-on-surface uppercase tracking-tight">Thông báo kết quả xét duyệt</h2>
+            </div>
+            <ul class="divide-y divide-outline-variant/60">
+                @foreach (var d in ketQuaXuLy)
+                {
+                    var duyet = d.TrangThai == "APPROVED";
+                    var moi = phieuChuaXem.Contains(d.MaDatPhong);
+                    <li class="flex items-start gap-3 px-4 py-2.5 @(moi ? (duyet ? "bg-emerald-50/70" : "bg-red-50/70") : "")">
+                        <span class="material-symbols-outlined text-[20px] mt-0.5 @(duyet ? "text-emerald-600" : "text-red-600")">@(duyet ? "check_circle" : "cancel")</span>
+                        <div class="min-w-0 flex-1">
+                            <div class="text-on-surface">
+                                Phiếu <b>#@d.MaDatPhong</b> · phòng <b>@d.PhongHoc?.CodePhong</b> · @d.NgayDat.ToString("dd/MM/yyyy")
+                                (@Catalogs.MoTaKhoang(d.GioBatDau, d.GioKetThuc)) <b>@(duyet ? "đã được duyệt" : "đã bị từ chối")</b>.
+                            </div>
+                            <div class="text-[11px] text-outline mt-0.5">
+                                Xử lý bởi @(d.NguoiDuyetNav?.HoTen ?? d.NguoiDuyet ?? "CSVC")
+                                @if (d.ThoiDiemXuLy is DateTime lucXuLy)
+                                {
+                                    <text>· @lucXuLy.ToString("dd/MM/yyyy HH:mm")</text>
+                                }
+                            </div>
+                        </div>
+                        @if (moi)
+                        {
+                            <span class="shrink-0 mt-0.5 px-1.5 py-0.5 rounded-full bg-error-container text-on-error-container font-label-sm font-bold text-[10px]">Mới</span>
+                        }
+                    </li>
+                }
+            </ul>
+        </section>
+    }
+
+    <div class="bg-surface-container-lowest border border-outline-variant rounded-lg shadow-sm overflow-hidden">
+        <div class="overflow-x-auto">
+            <table class="w-full text-body-sm font-body-sm">
+                <thead class="bg-surface-container-low text-left text-on-surface-variant font-label-md text-label-md">
+                    <tr>
+                        <th class="p-3">Mã phiếu</th>
+                        <th class="p-3">Người gửi</th>
+                        <th class="p-3">Phòng</th>
+                        <th class="p-3">Ngày &amp; giờ mượn</th>
+                        <th class="p-3">Mục đích</th>
+                        <th class="p-3 text-right">Số người</th>
+                        <th class="p-3">Trạng thái</th>
+                        <th class="p-3 text-right">Thao tác</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @if (!Model.Any())
+                    {
+                        <tr><td colspan="8" class="p-8 text-center text-on-surface-variant">Chưa có phiếu đăng ký nào.</td></tr>
+                    }
+                    @foreach (var d in Model)
+                    {
+                        var huyDuoc = d.TrangThai == "PENDING" && d.NguoiYeuCau == uid;
+                        <tr class="border-t border-outline-variant/60 hover:bg-surface-container-low/60 transition-colors">
+                            <td class="p-3 font-semibold text-on-surface-variant">#@d.MaDatPhong</td>
+                            <td class="p-3">
+                                <div class="text-on-surface">@d.NguoiYeuCauNav?.HoTen</div>
+                                <div class="text-[11px] text-outline">@d.NguoiYeuCau</div>
+                            </td>
+                            <td class="p-3 font-semibold text-primary">@d.PhongHoc?.CodePhong</td>
+                            <td class="p-3">
+                                <div>@d.NgayDat.ToString("dd/MM/yyyy")</div>
+                                <div class="text-[11px] text-outline">@Catalogs.MoTaKhoang(d.GioBatDau, d.GioKetThuc)</div>
+                            </td>
+                            <td class="p-3 max-w-[280px]">@d.MucDich</td>
+                            <td class="p-3 text-right">@(d.SoLuongNguoiThamGia?.ToString() ?? "—")</td>
+                            <td class="p-3">
+                                <span class="inline-flex items-center gap-1 border font-label-sm text-label-sm px-2 py-0.5 rounded-lg @(mauTrangThai.GetValueOrDefault(d.TrangThai, "bg-surface-container text-on-surface-variant border-outline-variant"))">
+                                    @Catalogs.Label(Catalogs.TrangThaiDatPhong, d.TrangThai)
+                                </span>
+                                @if (d.NguoiDuyetNav?.HoTen is string nguoiDuyet && !string.IsNullOrWhiteSpace(nguoiDuyet))
+                                {
+                                    <div class="text-[11px] text-outline mt-0.5">@nguoiDuyet</div>
+                                }
+                            </td>
+                            <td class="p-3">
+                                <div class="flex items-center justify-end gap-2">
+                                    @if (huyDuoc)
+                                    {
+                                        <form asp-action="Cancel" asp-route-id="@d.MaDatPhong" method="post">
+                                            <input type="hidden" name="page" value="@(page)" />
+                                            <button class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-surface-container border border-outline-variant hover:bg-surface-container-high font-label-md text-label-md text-on-surface transition-colors">
+                                                <span class="material-symbols-outlined text-[16px]">delete</span>Hủy phiếu
+                                            </button>
+                                        </form>
+                                    }
+                                    else
+                                    {
+                                        <span class="text-outline">—</span>
+                                    }
+                                </div>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+        <div class="border-t border-outline-variant/60">
+            @await Html.PartialAsync("_PhanTrang", phanTrang)
+        </div>
+    </div>
+}
+
+@section Scripts {
+<script>
+  (() => {
+    const mo = id => {
+      const el = document.getElementById(id);
+      if (!el) return;
+      el.classList.remove('hidden');
+      el.classList.add('flex');
+    };
+    const dong = el => {
+      el.classList.add('hidden');
+      el.classList.remove('flex');
+    };
+    document.querySelectorAll('[data-mo-modal]').forEach(btn => {
+      btn.addEventListener('click', () => mo(btn.dataset.moModal));
+    });
+    document.querySelectorAll('[data-dong-modal]').forEach(btn => {
+      btn.addEventListener('click', () => dong(btn.closest('.fixed.inset-0')));
+    });
+    document.querySelectorAll('.fixed.inset-0').forEach(el => {
+      el.addEventListener('click', e => { if (e.target === el) dong(el); });
+    });
+    document.addEventListener('keydown', e => {
+      if (e.key === 'Escape') document.querySelectorAll('.fixed.inset-0.flex').forEach(dong);
+    });
+
+    document.querySelectorAll('.js-pheduyet-form').forEach(form => {
+      form.addEventListener('submit', () => {
+        const chon = form.querySelector('input[name="quyetDinh"]:checked')?.value;
+        form.action = chon === 'reject' ? form.dataset.reject : form.dataset.approve;
+      });
+    });
+  })();
+</script>
+}

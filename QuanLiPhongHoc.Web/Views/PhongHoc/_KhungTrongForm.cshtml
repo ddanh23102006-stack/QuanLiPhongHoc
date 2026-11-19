@@ -1,0 +1,85 @@
+@model List<KhaiKhungVm>
+@{
+    var macDinh = string.Join(" · ", Catalogs.KhungTrongMacDinh.Select(k => Catalogs.MoTaKhoang(k.Start, k.End)));
+}
+<fieldset class="pt-3 border-t border-surface-container">
+  <legend class="text-sm font-semibold">Khung giờ phòng trống</legend>
+  <p class="text-xs text-on-surface-variant mt-1 mb-2">
+    Mỗi dòng là một khoảng giờ phòng sẵn sàng cho mượn, ví dụ 07:00 – 11:25. Người mượn chỉ đặt được
+    khung giờ nằm trọn trong các khoảng này. Ba khoảng mặc định: @macDinh.
+  </p>
+  <table class="w-full text-sm">
+    <thead>
+      <tr class="text-left text-xs text-on-surface-variant">
+        <th class="pb-1 w-8">#</th>
+        <th class="pb-1">Trống từ</th>
+        <th class="pb-1">Đến</th>
+        <th class="pb-1 w-16"></th>
+      </tr>
+    </thead>
+    <tbody id="dsKhung">
+      @for (var i = 0; i < Model.Count; i++)
+      {
+        <tr>
+          <td class="py-2 text-on-surface-variant">@(i + 1)</td>
+          <td class="py-2">
+            <input name="KhungTrong[@i].Tu" type="text" data-gio inputmode="numeric" maxlength="8" autocomplete="off" placeholder="HH:mm" value="@Model[i].Tu"
+                   class="rounded-lg bg-surface-container-low px-2 py-1" />
+          </td>
+          <td class="py-2">
+            <input name="KhungTrong[@i].Den" type="text" data-gio inputmode="numeric" maxlength="8" autocomplete="off" placeholder="HH:mm" value="@Model[i].Den"
+                   class="rounded-lg bg-surface-container-low px-2 py-1" />
+          </td>
+          <td class="py-2 text-right">
+            <button type="button" class="xoa-khung text-error text-xs font-semibold">Xóa</button>
+          </td>
+        </tr>
+      }
+    </tbody>
+  </table>
+  <button type="button" id="themKhung"
+          class="mt-2 px-3 py-1.5 rounded-lg border border-outline-variant text-sm font-semibold">
+    + Thêm khung giờ
+  </button>
+  <p class="text-[11px] text-outline mt-1">Dòng để trống hai ô giờ sẽ được bỏ qua khi lưu.</p>
+
+  <template id="mauKhung">
+    <tr>
+      <td class="py-2 text-on-surface-variant"></td>
+      <td class="py-2"><input name="KhungTrong[0].Tu" type="text" data-gio inputmode="numeric" maxlength="8" autocomplete="off" placeholder="HH:mm" class="rounded-lg bg-surface-container-low px-2 py-1" /></td>
+      <td class="py-2"><input name="KhungTrong[0].Den" type="text" data-gio inputmode="numeric" maxlength="8" autocomplete="off" placeholder="HH:mm" class="rounded-lg bg-surface-container-low px-2 py-1" /></td>
+      <td class="py-2 text-right"><button type="button" class="xoa-khung text-error text-xs font-semibold">Xóa</button></td>
+    </tr>
+  </template>
+</fieldset>
+
+<script>
+  (function () {
+    const ds = document.getElementById('dsKhung');
+    const mau = document.querySelector('#mauKhung').innerHTML;
+
+    const danhSoLai = () => {
+      [...ds.rows].forEach((hang, i) => {
+        hang.cells[0].textContent = i + 1;
+        hang.querySelector('input[name$=".Tu"]').name = `KhungTrong[${i}].Tu`;
+        hang.querySelector('input[name$=".Den"]').name = `KhungTrong[${i}].Den`;
+      });
+      ds.querySelectorAll('.xoa-khung').forEach(nut => nut.disabled = ds.rows.length <= 1);
+    };
+
+    document.getElementById('themKhung').addEventListener('click', () => {
+      const tao = document.createElement('template');
+      tao.innerHTML = mau.trim();
+      ds.appendChild(tao.content.firstElementChild);
+      danhSoLai();
+    });
+
+    ds.addEventListener('click', e => {
+      if (!e.target.classList.contains('xoa-khung')) return;
+      e.target.closest('tr').remove();
+      danhSoLai();
+    });
+
+    danhSoLai();
+  })();
+</script>

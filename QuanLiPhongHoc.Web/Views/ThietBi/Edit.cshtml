@@ -1,0 +1,199 @@
+@model ThietBiFormVm
+@using System.Text.Json
+@{
+    ViewData["Title"] = "Sửa thiết bị";
+    var toaNhas = ViewBag.ToaNhas as List<ToaNha> ?? new List<ToaNha>();
+    var phongs = ViewBag.Phongs as List<PhongHoc> ?? new List<PhongHoc>();
+    var jsonPhongs = JsonSerializer.Serialize(phongs.Select(x => new { x.MaPhong, x.CodePhong, x.MaToaNha }));
+    var dsToa = JsonSerializer.Serialize(toaNhas.Select(x => new { x.MaToaNha, x.CodeToaNha }));
+    var quayLai = ViewBag.ReturnUrl as string ?? $"/ThietBi/Details/{Model.MaThietBi}";
+}
+<div class="flex flex-wrap items-center justify-between gap-space-md mb-space-md">
+  <div>
+    <div class="text-xs text-on-surface-variant">CSVC / <a class="text-primary" href="/ThietBi">Thiết bị</a> / <span class="font-bold">@Model.TenThietBi</span></div>
+    <h1 class="text-xl font-bold">Sửa loại thiết bị</h1>
+    <p class="text-sm text-on-surface-variant mt-1">Cập nhật thông tin loại thiết bị. Chọn thêm nơi phân bổ nếu muốn bổ sung thiết bị vào phòng hoặc tòa nhà.</p>
+  </div>
+  <a class="px-3 py-2 rounded-lg bg-surface-container text-on-surface font-semibold text-sm" href="/ThietBi/Details/@Model.MaThietBi">← Chi tiết</a>
+</div>
+
+<form asp-action="Edit" method="post" class="bg-surface-container-lowest rounded-xl shadow-sm p-space-lg max-w-4xl">
+  <div asp-validation-summary="ModelOnly" class="text-error text-sm mb-space-md"></div>
+  <input type="hidden" asp-for="MaThietBi" />
+  <input type="hidden" name="returnUrl" value="@quayLai" />
+
+  <h2 class="font-semibold text-sm uppercase text-on-surface-variant mb-3">Thông tin loại thiết bị</h2>
+  <div class="grid grid-cols-1 md:grid-cols-2 gap-space-md">
+    <div>
+      <label class="block text-xs font-semibold text-on-surface-variant mb-1">Mã thiết bị</label>
+      <input asp-for="MaCodeThietBi" class="w-full rounded-lg bg-surface-container-low px-3 py-2 text-sm font-mono uppercase" placeholder="VD: TB-MC-01" />
+      <span class="text-xs text-on-surface-variant">Mã quản lý do CSVC đặt, không trùng với thiết bị khác.</span>
+      <span asp-validation-for="MaCodeThietBi" class="block text-error text-xs"></span>
+    </div>
+    <div>
+      <label class="block text-xs font-semibold text-on-surface-variant mb-1">Tên thiết bị <span class="text-error">*</span></label>
+      <input asp-for="TenThietBi" class="w-full rounded-lg bg-surface-container-low px-3 py-2 text-sm" placeholder="VD: Máy chiếu Projector" />
+      <span asp-validation-for="TenThietBi" class="text-error text-xs"></span>
+    </div>
+    <div>
+      <label class="block text-xs font-semibold text-on-surface-variant mb-1">Loại phòng áp dụng</label>
+      <select asp-for="LoaiPhong" class="w-full rounded-lg bg-surface-container-low px-3 py-2 text-sm">
+        <option value="">Mọi loại phòng</option>
+        @foreach (var kv in Catalogs.LoaiPhong)
+        {
+          <option value="@kv.Key">@kv.Value</option>
+        }
+      </select>
+    </div>
+  </div>
+
+  <h2 class="font-semibold text-sm uppercase text-on-surface-variant mt-space-lg mb-3">Bổ sung phân bổ</h2>
+  <p class="text-xs text-on-surface-variant mb-space-md">Không chọn gì thì chỉ cập nhật thông tin loại thiết bị.</p>
+  <input type="hidden" name="PhamViPhanBo" id="phamViPhanBo" value="@Model.PhamViPhanBo" />
+  <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-space-md">
+    <label class="phan-bo-tile flex items-start gap-2 p-3 rounded-lg border border-surface-variant bg-surface-container-low cursor-pointer">
+      <input type="radio" name="chonPhanBo" value="PHONG" class="mt-0.5" checked="@(Model.PhamViPhanBo == "PHONG")" />
+      <span>
+        <span class="block font-semibold text-sm">Bổ sung vào phòng cụ thể</span>
+        <span class="block text-xs text-on-surface-variant">Chọn tòa nhà rồi chọn phòng.</span>
+      </span>
+    </label>
+    <label class="phan-bo-tile flex items-start gap-2 p-3 rounded-lg border border-surface-variant bg-surface-container-low cursor-pointer">
+      <input type="radio" name="chonPhanBo" value="TOA" class="mt-0.5" checked="@(Model.PhamViPhanBo == "TOA")" />
+      <span>
+        <span class="block font-semibold text-sm">Bổ sung cho cả tòa nhà</span>
+        <span class="block text-xs text-on-surface-variant">Mỗi phòng trong tòa nhận cùng số lượng.</span>
+      </span>
+    </label>
+  </div>
+
+  <div id="khoiPhanBo" class="grid grid-cols-1 md:grid-cols-2 gap-space-md @(string.IsNullOrEmpty(Model.PhamViPhanBo) ? "hidden" : "")">
+    <div id="khoiToa" class="md:col-span-2">
+      <label class="block text-xs font-semibold text-on-surface-variant mb-1">Tòa nhà</label>
+      <select name="MaToaNha" id="selToa" class="w-full rounded-lg bg-surface-container-low px-3 py-2 text-sm">
+        <option value="">— Chọn tòa nhà —</option>
+        @foreach (var t in toaNhas)
+        {
+          <option value="@t.MaToaNha" selected="@(Model.MaToaNha == t.MaToaNha)">@t.CodeToaNha — @t.TenToaNha</option>
+        }
+      </select>
+      <span asp-validation-for="MaToaNha" class="block text-error text-xs"></span>
+      <span id="goiYToa" class="block text-xs text-on-surface-variant mt-1"></span>
+    </div>
+    <div id="khoiPhong">
+      <label class="block text-xs font-semibold text-on-surface-variant mb-1">Phòng cụ thể</label>
+      <select name="MaPhong" id="selPhong" class="w-full rounded-lg bg-surface-container-low px-3 py-2 text-sm">
+        <option value="">— Chọn phòng —</option>
+        @foreach (var p in phongs)
+        {
+          <option value="@p.MaPhong" selected="@(Model.MaPhong == p.MaPhong)">@p.CodePhong</option>
+        }
+      </select>
+      <span asp-validation-for="MaPhong" class="block text-error text-xs"></span>
+    </div>
+    <div>
+      <label class="block text-xs font-semibold text-on-surface-variant mb-1">Số lượng mỗi phòng</label>
+      <input asp-for="SoLuong" type="number" min="1" max="100" class="w-full rounded-lg bg-surface-container-low px-3 py-2 text-sm font-mono" />
+      <span asp-validation-for="SoLuong" class="block text-error text-xs"></span>
+    </div>
+    <div>
+      <label class="block text-xs font-semibold text-on-surface-variant mb-1">Nhãn nhận diện</label>
+      <input asp-for="NhanDienThietBi" class="w-full rounded-lg bg-surface-container-low px-3 py-2 text-sm" placeholder="VD: Máy chiếu Samsung" />
+      <span class="text-xs text-on-surface-variant">Hệ thống tự nối thêm mã phòng và số thứ tự.</span>
+    </div>
+    <div>
+      <label class="block text-xs font-semibold text-on-surface-variant mb-1">Trạng thái ban đầu</label>
+      <select asp-for="TrangThai" class="w-full rounded-lg bg-surface-container-low px-3 py-2 text-sm">
+        @foreach (var kv in Catalogs.TrangThaiThietBi)
+        {
+          <option value="@kv.Key">@kv.Value</option>
+        }
+      </select>
+    </div>
+  </div>
+
+  <div id="xemTruoc" class="mt-space-md px-space-md py-2.5 rounded-lg bg-primary-fixed/40 text-on-primary-fixed-variant text-sm"></div>
+
+  <div class="flex gap-2 mt-space-lg">
+    <button type="submit" class="px-4 py-2 rounded-lg bg-primary-container text-on-primary font-semibold text-sm">Lưu thay đổi</button>
+    <a class="px-4 py-2 rounded-lg bg-surface-container text-on-surface font-semibold text-sm" href="@quayLai">Hủy</a>
+  </div>
+</form>
+
+@section Scripts {
+<script>
+  (() => {
+    const phongs = @Html.Raw(jsonPhongs);
+    const dsToa = @Html.Raw(dsToa);
+    const selToa = document.getElementById('selToa');
+    const selPhong = document.getElementById('selPhong');
+    const soLuong = document.getElementById('SoLuong');
+    const khoiPhanBo = document.getElementById('khoiPhanBo');
+    const khoiPhong = document.getElementById('khoiPhong');
+    const goiYToa = document.getElementById('goiYToa');
+    const xemTruoc = document.getElementById('xemTruoc');
+    const phamViInput = document.getElementById('phamViPhanBo');
+
+    const phamVi = () => document.querySelector('input[name="chonPhanBo"]:checked')?.value || '';
+
+    function phongCuaToa(maToa) {
+      return maToa ? phongs.filter(p => String(p.MaToaNha) === String(maToa)) : phongs;
+    }
+
+    function napPhong() {
+      const maToa = selToa.value;
+      const dangChon = selPhong.value;
+      const ds = phongCuaToa(maToa);
+      selPhong.innerHTML = '<option value="">— Chọn phòng —</option>' +
+        ds.map(p => `<option value="${p.MaPhong}">${p.CodePhong}</option>`).join('');
+      if (ds.some(p => String(p.MaPhong) === dangChon)) selPhong.value = dangChon;
+    }
+
+    function capNhat() {
+      const pv = phamVi();
+      phamViInput.value = pv;
+      khoiPhanBo.classList.toggle('hidden', !pv);
+      khoiPhong.classList.toggle('hidden', pv !== 'PHONG');
+      selPhong.disabled = pv !== 'PHONG';
+      goiYToa.classList.toggle('hidden', pv !== 'TOA');
+
+      const sl = Math.max(1, parseInt(soLuong.value || '1', 10));
+      let thongBao = 'Chỉ cập nhật thông tin loại thiết bị, không tạo thêm bản ghi.';
+      if (pv === 'PHONG') {
+        const phong = phongs.find(p => String(p.MaPhong) === String(selPhong.value));
+        thongBao = phong
+          ? `Sẽ bổ sung ${sl} bản ghi cho phòng ${phong.CodePhong}.`
+          : 'Chọn tòa nhà và phòng cụ thể để bổ sung thiết bị.';
+        goiYToa.textContent = '';
+      } else if (pv === 'TOA') {
+        const soPhong = phongCuaToa(selToa.value).length;
+        const toa = dsToa.find(t => String(t.MaToaNha) === String(selToa.value));
+        if (toa) {
+          goiYToa.textContent = `Tòa ${toa.CodeToaNha} có ${soPhong} phòng.`;
+          thongBao = `Sẽ bổ sung ${soPhong * sl} bản ghi: ${sl} thiết bị cho mỗi phòng trong ${soPhong} phòng.`;
+        } else {
+          goiYToa.textContent = '';
+          thongBao = 'Chọn tòa nhà để bổ sung thiết bị cho toàn bộ phòng bên trong.';
+        }
+      }
+      xemTruoc.textContent = thongBao;
+    }
+
+    selToa.addEventListener('change', () => { if (phamVi() === 'PHONG') napPhong(); capNhat(); });
+    selPhong.addEventListener('change', capNhat);
+    soLuong.addEventListener('input', capNhat);
+    document.querySelectorAll('input[name="chonPhanBo"]').forEach(r => r.addEventListener('change', () => {
+      if (phamVi() === 'PHONG' && selToa.value) napPhong();
+      capNhat();
+    }));
+
+    const pvBanDau = '@Model.PhamViPhanBo';
+    const radioBanDau = document.querySelector(`input[name="chonPhanBo"][value="${pvBanDau}"]`);
+    if (radioBanDau) {
+      radioBanDau.checked = true;
+      if (pvBanDau === 'PHONG' && selToa.value) napPhong();
+    }
+    capNhat();
+  })();
+</script>
+}

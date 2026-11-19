@@ -1,0 +1,117 @@
+@model LichHocFormVm
+@{
+    ViewData["Title"] = "Xếp lịch thủ công";
+    var phongs = ViewBag.Phongs as IEnumerable<PhongHoc> ?? [];
+    var giangViens = ViewBag.GiangViens as IEnumerable<NguoiDung> ?? [];
+    string NhomPhong(PhongHoc p) => p.LoaiPhong == Catalogs.SanTheDucNgoaiTroi
+        ? "sports"
+        : p.LoaiPhong == Catalogs.RoomTheory ? "theory"
+        : Catalogs.LaPhongThucHanh(p.LoaiPhong) ? "practice" : "other";
+}
+<div class="max-w-3xl mx-auto bg-surface-container-lowest rounded-xl border border-outline-variant shadow-lg overflow-hidden">
+  <div class="px-5 py-4 border-b border-outline-variant flex items-center justify-between">
+    <div>
+      <h1 class="text-xl font-bold text-primary">Xếp lịch thủ công</h1>
+      <p class="text-sm text-on-surface-variant mt-1">Chọn ca, giảng viên và phòng từ dữ liệu CSVC; hệ thống kiểm tra xung đột trước khi lưu.</p>
+    </div>
+    <a href="/LichHoc" aria-label="Đóng" class="text-on-surface-variant hover:text-error">
+      <span class="material-symbols-outlined">close</span>
+    </a>
+  </div>
+  <form asp-action="Create" method="post" class="p-5 space-y-4" id="form-lich">
+    @Html.AntiForgeryToken()
+    <div asp-validation-summary="All" class="text-error text-sm"></div>
+    <label class="block text-sm font-semibold">
+      Học phần
+      <select asp-for="MaHocPhan" asp-items="ViewBag.HocPhans" class="mt-1 w-full rounded-lg border border-outline-variant bg-surface-container-low px-3 py-2"></select>
+    </label>
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+      <label class="block text-sm font-semibold">
+        Thứ trong tuần
+        <input asp-for="NgayHoc" type="date" class="mt-1 w-full rounded-lg border border-outline-variant bg-surface-container-low px-3 py-2" />
+      </label>
+      <label class="block text-sm font-semibold">
+        Khung ca học
+        <select asp-for="CaHoc" asp-items="ViewBag.CaHoc" class="mt-1 w-full rounded-lg border border-outline-variant bg-surface-container-low px-3 py-2"></select>
+      </label>
+    </div>
+    <label class="block text-sm font-semibold">
+      Giảng viên phụ trách / thay thế
+      <select asp-for="MaGiangVienDayThay" class="mt-1 w-full rounded-lg border border-outline-variant bg-surface-container-low px-3 py-2">
+        <option value="">Giảng viên chính của học phần</option>
+        @foreach (var gv in giangViens)
+        {
+          <option value="@gv.MaNguoiDung" selected="@(Model.MaGiangVienDayThay == gv.MaNguoiDung)">@gv.HoTen (@gv.MaNguoiDung)</option>
+        }
+      </select>
+    </label>
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+      <label class="block text-sm font-semibold">
+        Lọc loại phòng
+        <select id="LoaiPhongLoc" class="mt-1 w-full rounded-lg border border-outline-variant bg-surface-container-low px-3 py-2">
+          <option value="">Tất cả loại phòng</option>
+          <option value="theory">Phòng lý thuyết</option>
+          <option value="practice">Phòng thực hành</option>
+          <option value="sports">Sân thể dục</option>
+        </select>
+      </label>
+      <label class="block text-sm font-semibold">
+        Đổi phòng học / sân bãi
+        <select asp-for="MaPhong" class="mt-1 w-full rounded-lg border border-outline-variant bg-surface-container-low px-3 py-2">
+          @foreach (var p in phongs.Where(x => NhomPhong(x) != "other"))
+          {
+            <option value="@p.MaPhong" data-kind="@NhomPhong(p)" selected="@(Model.MaPhong == p.MaPhong)">
+              @p.CodePhong (@p.ToaNha?.CodeToaNha - @p.SucChua chỗ)
+            </option>
+          }
+        </select>
+      </label>
+    </div>
+    <label class="block text-sm font-semibold">
+      Ghi chú điều phối
+      <input asp-for="GhiChuDieuPhoi" maxlength="500" placeholder="Nhập ghi chú nếu cần" class="mt-1 w-full rounded-lg border border-outline-variant bg-surface-container-low px-3 py-2" />
+    </label>
+    <p id="conflict-box" class="text-sm text-error hidden"></p>
+    <div class="flex flex-wrap justify-end gap-2 pt-2">
+      <a href="/LichHoc" class="px-4 py-2 rounded-lg bg-surface-container text-on-surface font-semibold">Hủy / Quay về</a>
+      <button type="submit" class="px-5 py-2 rounded-lg bg-primary text-on-primary font-bold">Lưu lịch</button>
+    </div>
+  </form>
+</div>
+@section Scripts {
+<script>
+const roomTypeFilter = document.getElementById('LoaiPhongLoc');
+const roomSelect = document.getElementById('MaPhong');
+function filterRooms() {
+  const kind = roomTypeFilter.value;
+  let firstVisible = '';
+  for (const option of roomSelect.options) {
+    const visible = !kind || option.dataset.kind === kind;
+    option.hidden = !visible;
+    option.disabled = !visible;
+    if (visible && !firstVisible) firstVisible = option.value;
+  }
+  if (roomSelect.selectedOptions.length && roomSelect.selectedOptions[0].disabled)
+    roomSelect.value = firstVisible;
+  check();
+}
+async function check() {
+  const params = new URLSearchParams({
+    maPhong: roomSelect.value,
+    ngay: document.getElementById('NgayHoc').value,
+    ca: document.getElementById('CaHoc').value,
+    maHocPhan: document.getElementById('MaHocPhan').value,
+    maGiangVienDayThay: document.getElementById('MaGiangVienDayThay').value
+  });
+  const response = await fetch(`/LichHoc/CheckConflict?${params}`);
+  const data = await response.json();
+  const box = document.getElementById('conflict-box');
+  box.classList.toggle('hidden', !data.conflict);
+  box.textContent = data.conflict ? data.messages.join(' ') : '';
+}
+roomTypeFilter.addEventListener('change', filterRooms);
+['MaPhong','NgayHoc','CaHoc','MaHocPhan','MaGiangVienDayThay'].forEach(id =>
+  document.getElementById(id).addEventListener('change', check));
+filterRooms();
+</script>
+}

@@ -1,0 +1,65 @@
+@model HocPhanFormVm
+@{
+    ViewData["Title"] = "Sửa học phần";
+    var giangViens = ViewBag.GiangViens as IEnumerable<NguoiDung> ?? [];
+}
+<div class="flex flex-wrap items-center justify-between gap-space-md mb-space-md">
+  <div>
+    <div class="text-xs text-on-surface-variant">Đào tạo / <a class="text-primary" href="/HocPhan">Học phần</a> / <span class="font-bold">@Model.MaHocPhan</span></div>
+    <h1 class="text-xl font-bold">Sửa học phần</h1>
+  </div>
+  <a class="px-3 py-2 rounded-lg bg-surface-container text-on-surface font-semibold text-sm" href="/LichHoc">← Thời khóa biểu tuần</a>
+</div>
+
+<form asp-action="Edit" method="post" class="bg-surface-container-lowest rounded-xl shadow-sm p-space-lg max-w-3xl">
+  <div asp-validation-summary="ModelOnly" class="text-error text-sm mb-space-md"></div>
+  <div class="grid grid-cols-1 md:grid-cols-2 gap-space-md">
+    <div>
+      <label class="block text-xs font-semibold text-on-surface-variant mb-1">Mã học phần</label>
+      <input asp-for="MaHocPhan" readonly class="w-full rounded-lg bg-surface-container-high px-3 py-2 text-sm font-mono" />
+      <span asp-validation-for="MaHocPhan" class="text-error text-xs"></span>
+    </div>
+    <div>
+      <label class="block text-xs font-semibold text-on-surface-variant mb-1">Tên học phần <span class="text-error">*</span></label>
+      <input asp-for="TenHocPhan" class="w-full rounded-lg bg-surface-container-low px-3 py-2 text-sm" />
+      <span asp-validation-for="TenHocPhan" class="text-error text-xs"></span>
+    </div>
+    <div>
+      <label class="block text-xs font-semibold text-on-surface-variant mb-1">Số lượng đăng ký (sĩ số)</label>
+      <input asp-for="SoLuongDangKy" type="number" min="1" max="1000" class="w-full rounded-lg bg-surface-container-low px-3 py-2 text-sm font-mono" />
+      <span asp-validation-for="SoLuongDangKy" class="text-error text-xs"></span>
+    </div>
+    <div>
+      <label class="block text-xs font-semibold text-on-surface-variant mb-1">Giảng viên phụ trách</label>
+      <select asp-for="MaGiangVien" class="w-full rounded-lg bg-surface-container-low px-3 py-2 text-sm">
+        <option value="">— Chưa phân công —</option>
+        @foreach (var gv in giangViens)
+        {
+          <option value="@gv.MaNguoiDung">@gv.HoTen (@gv.MaNguoiDung)</option>
+        }
+      </select>
+    </div>
+    <div class="md:col-span-2">
+      <label class="inline-flex items-center gap-2 text-sm">
+        <input asp-for="LaThucHanh" class="w-4 h-4 rounded" />
+        <span>Là lớp thực hành (chỉ xếp được vào phòng thí nghiệm / thực hành)</span>
+      </label>
+    </div>
+    <div class="md:col-span-2">
+      <label class="block text-xs font-semibold text-on-surface-variant mb-1">Nhóm ngành</label>
+      <select asp-for="NhomNganh" class="w-full rounded-lg bg-surface-container-low px-3 py-2 text-sm">
+        <option value="">— Không ràng buộc ngành —</option>
+        @foreach (var kv in Catalogs.NhomNganh)
+        {
+          <option value="@kv.Key">@kv.Value</option>
+        }
+      </select>
+      <span asp-validation-for="NhomNganh" class="text-error text-xs"></span>
+      <p class="mt-1 text-xs text-on-surface-variant">Học phần thực hành chỉ xếp vào đúng họ phòng của nhóm ngành.</p>
+    </div>
+  </div>
+  <div class="flex gap-2 mt-space-lg">
+    <button type="submit" class="px-4 py-2 rounded-lg bg-primary-container text-on-primary font-semibold text-sm">Cập nhật</button>
+    <a class="px-4 py-2 rounded-lg bg-surface-container text-on-surface font-semibold text-sm" href="/LichHoc">Hủy / Quay về TKB tuần</a>
+  </div>
+</form>

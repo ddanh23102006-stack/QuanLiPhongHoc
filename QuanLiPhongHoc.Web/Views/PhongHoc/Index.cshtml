@@ -1,0 +1,496 @@
+@model PhongHocQuanLyVm
+@{
+    ViewData["Title"] = "Quản lý phòng học";
+    var laFacility = User.IsInRole(AppRoles.Facility);
+
+    string Sac(PhongHocRowVm x) => x.TrangThaiPhong switch
+    {
+        "MAINTENANCE" or "UNAVAILABLE" => "bg-[#FFF8E1] text-[#E67E22] border-[#FFE082]",
+        _ => x.CoLopHomNay ? "bg-[#FFEBEE] text-[#DC3545] border-[#EF9A9A]" : "bg-[#E8F5E9] text-[#28A745] border-[#A5D6A7]"
+    };
+    string TenTrangThai(PhongHocRowVm x) => x.TrangThaiPhong switch
+    {
+        "MAINTENANCE" => "Đang bảo trì / Sửa chữa",
+        "UNAVAILABLE" => "Ngưng sử dụng",
+        _ => x.CoLopHomNay ? "Đang có lớp" : "Đang trống"
+    };
+    string IconLoai(string loai) => loai switch
+    {
+        "PHONG_MAY_TINH" => "terminal",
+        "LAB_HOA_SINH" or "LAB_CNTP" => "science",
+        "LAB_DIEN_DIEN_TU" => "electrical_services",
+        "XUONG_CO_KHI" => "precision_manufacturing",
+        "PHONG_LUYEN_THANH" or "PHONG_HOA_TAU" => "music_note",
+        "PHONG_HOA_VIEN_MY_THUAT" or "PHONG_DO_AN_KIEN_TRUC" => "palette",
+        "SAN_THE_DUC_NGOAI_TROI" => "sports_soccer",
+        "PHONG_CHUC_NANG" => "meeting_room",
+        _ => "school"
+    };
+    var khungMacDinhJson = System.Text.Json.JsonSerializer.Serialize(
+        Catalogs.KhungTrongMacDinh.Select(k => new[] { k.Start.ToString("HH\\:mm"), k.End.ToString("HH\\:mm") }));
+}
+
+<nav class="flex flex-col md:flex-row md:items-center md:justify-between gap-3 pb-3 border-b border-surface-variant">
+    <div>
+        <div class="flex items-center gap-1.5 font-label-sm text-label-sm text-on-surface-variant mb-1">
+            <a href="/Home" class="hover:text-primary">Trang chủ</a>
+            <span class="material-symbols-outlined text-[14px]">chevron_right</span>
+            <span class="text-primary font-semibold">Quản lý phòng học</span>
+        </div>
+        <h1 class="font-headline-lg text-headline-lg font-bold text-primary">QUẢN LÝ PHÒNG HỌC &amp; CƠ SỞ VẬT CHẤT</h1>
+        <p class="font-body-sm text-body-sm text-on-surface-variant mt-0.5">
+            Theo dõi, thêm mới và cập nhật trạng thái hoạt động của danh mục phòng học; thay đổi ở đây xuất hiện ngay trên trang đăng ký mượn phòng.
+        </p>
+    </div>
+    @if (laFacility)
+    {
+        <button type="button" class="them-phong flex items-center gap-1.5 bg-primary-container text-on-primary hover:bg-primary font-label-md text-label-md px-3.5 py-2 rounded-lg font-semibold shadow-sm transition-all active:scale-[0.98] cursor-pointer">
+            <span class="material-symbols-outlined text-[18px]">add</span>
+            <span>Thêm phòng học mới</span>
+        </button>
+    }
+</nav>
+
+<!-- KPI -->
+<section class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
+    <div class="bg-surface-container-lowest p-3.5 rounded-lg border border-surface-variant flex items-center justify-between">
+        <div>
+            <p class="font-label-sm text-label-sm text-on-surface-variant">Tổng số phòng học CSVC</p>
+            <p class="font-headline-lg text-headline-lg font-bold text-on-surface mt-0.5">@Model.TongSo</p>
+            <p class="font-label-sm text-label-sm text-secondary">@Model.DanhSachToa.Count khu tòa nhà</p>
+        </div>
+        <div class="w-10 h-10 rounded-lg bg-surface-container text-primary flex items-center justify-center">
+            <span class="material-symbols-outlined text-[24px]">domain</span>
+        </div>
+    </div>
+    <div class="bg-surface-container-lowest p-3.5 rounded-lg border border-[#A5D6A7] relative overflow-hidden flex items-center justify-between">
+        <span class="absolute left-0 top-0 bottom-0 w-1 bg-[#28A745]"></span>
+        <div class="pl-1.5">
+            <p class="font-label-sm text-label-sm text-[#28A745]">Đang trống (có thể mượn)</p>
+            <p class="font-headline-lg text-headline-lg font-bold text-on-surface mt-0.5">@Model.SanSang</p>
+            <p class="font-label-sm text-label-sm text-secondary">@(Model.TongSo == 0 ? 0 : Model.SanSang * 100 / Model.TongSo)% danh mục</p>
+        </div>
+        <div class="w-10 h-10 rounded-lg bg-[#E8F5E9] text-[#28A745] flex items-center justify-center">
+            <span class="material-symbols-outlined text-[24px]">check_circle</span>
+        </div>
+    </div>
+    <div class="bg-surface-container-lowest p-3.5 rounded-lg border border-[#EF9A9A] relative overflow-hidden flex items-center justify-between">
+        <span class="absolute left-0 top-0 bottom-0 w-1 bg-[#DC3545]"></span>
+        <div class="pl-1.5">
+            <p class="font-label-sm text-label-sm text-[#DC3545]">Đang có lớp hôm nay</p>
+            <p class="font-headline-lg text-headline-lg font-bold text-on-surface mt-0.5">@Model.DangCoLop</p>
+            <p class="font-label-sm text-label-sm text-secondary">Suy ra từ thời khóa biểu @Model.Ngay.ToString("dd/MM/yyyy")</p>
+        </div>
+        <div class="w-10 h-10 rounded-lg bg-[#FFEBEE] text-[#DC3545] flex items-center justify-center">
+            <span class="material-symbols-outlined text-[24px]">groups</span>
+        </div>
+    </div>
+    <div class="bg-surface-container-lowest p-3.5 rounded-lg border border-[#FFE082] relative overflow-hidden flex items-center justify-between">
+        <span class="absolute left-0 top-0 bottom-0 w-1 bg-[#E67E22]"></span>
+        <div class="pl-1.5">
+            <p class="font-label-sm text-label-sm text-[#E67E22]">Bảo trì / Ngưng sử dụng</p>
+            <p class="font-headline-lg text-headline-lg font-bold text-on-surface mt-0.5">@Model.BaoTri</p>
+            <p class="font-label-sm text-label-sm text-error">Ẩn khỏi trang đăng ký mượn phòng</p>
+        </div>
+        <div class="w-10 h-10 rounded-lg bg-[#FFF8E1] text-[#E67E22] flex items-center justify-center">
+            <span class="material-symbols-outlined text-[24px]">build</span>
+        </div>
+    </div>
+</section>
+
+<!-- Filter -->
+<form method="get" class="bg-surface-container-lowest p-3 rounded-lg border border-surface-variant flex flex-col lg:flex-row gap-3 items-stretch lg:items-center">
+    <div class="relative flex-1 min-w-[260px]">
+        <span class="material-symbols-outlined absolute left-2.5 top-1/2 -translate-y-1/2 text-[18px] text-outline">search</span>
+        <input type="text" name="q" value="@Model.Q" placeholder="Tìm theo mã phòng (C.101, I4.211...)"
+               class="w-full pl-8 pr-3 h-[36px] bg-surface-container-lowest border border-surface-variant rounded-lg font-body-sm text-body-sm focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary text-on-surface" />
+    </div>
+    <select name="toa" class="h-[36px] px-2.5 bg-surface-container-lowest border border-surface-variant rounded-lg font-body-sm text-body-sm text-on-surface focus:outline-none focus:border-primary">
+        <option value="">Tất cả tòa nhà</option>
+        @foreach (var t in Model.DanhSachToa)
+        {
+            <option value="@t.MaToaNha" selected="@(Model.MaToaNha == t.MaToaNha)">@t.CodeToaNha — @t.TenToaNha</option>
+        }
+    </select>
+    <select name="loai" class="h-[36px] px-2.5 bg-surface-container-lowest border border-surface-variant rounded-lg font-body-sm text-body-sm text-on-surface focus:outline-none focus:border-primary">
+        <option value="">Tất cả loại phòng</option>
+        @foreach (var lp in Catalogs.LoaiPhong)
+        {
+            <option value="@lp.Key" selected="@(Model.LoaiPhong == lp.Key)">@lp.Value</option>
+        }
+    </select>
+    <select name="tt" class="h-[36px] px-2.5 bg-surface-container-lowest border border-surface-variant rounded-lg font-body-sm text-body-sm text-on-surface focus:outline-none focus:border-primary">
+        <option value="">Tất cả trạng thái</option>
+        <option value="AVAILABLE" selected="@(Model.TrangThai == "AVAILABLE")">Đang trống</option>
+        <option value="IN_USE" selected="@(Model.TrangThai == "IN_USE")">Đang có lớp</option>
+        <option value="MAINTENANCE" selected="@(Model.TrangThai == "MAINTENANCE")">Bảo trì / Ngưng sử dụng</option>
+    </select>
+    <button type="submit" class="h-[36px] px-3 bg-primary text-on-primary hover:bg-primary-container rounded-lg font-label-md text-label-md flex items-center gap-1 transition-colors">
+        <span class="material-symbols-outlined text-[18px]">filter_list</span><span>Lọc</span>
+    </button>
+    <a href="/PhongHoc" title="Đặt lại bộ lọc" class="h-[36px] px-2.5 bg-surface-container hover:bg-surface-variant text-primary rounded-lg font-label-md text-label-md flex items-center gap-1 transition-colors">
+        <span class="material-symbols-outlined text-[18px]">restart_alt</span><span>Đặt lại</span>
+    </a>
+</form>
+
+<!-- Table -->
+<section class="bg-surface-container-lowest rounded-lg border border-surface-variant overflow-hidden flex flex-col">
+    <div class="overflow-x-auto">
+        <table class="w-full text-left border-collapse">
+            <thead>
+                <tr class="bg-surface-container-low border-b border-surface-variant text-primary font-label-md text-label-md">
+                    <th class="py-2.5 px-3">Mã phòng &amp; vị trí</th>
+                    <th class="py-2.5 px-3">Loại phòng</th>
+                    <th class="py-2.5 px-3 text-center">Sức chứa</th>
+                    <th class="py-2.5 px-3">Trang thiết bị CSVC chính</th>
+                    <th class="py-2.5 px-3 text-center">Trạng thái</th>
+                    <th class="py-2.5 px-3">Hoạt động gần nhất</th>
+                    @if (laFacility)
+                    {
+                        <th class="py-2.5 px-3 font-semibold text-center w-36">Thao tác</th>
+                    }
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-surface-variant font-body-sm text-body-sm text-on-surface">
+                @if (!Model.Rows.Any())
+                {
+                    <tr><td colspan="7" class="py-8 px-3 text-center text-on-surface-variant">Không có phòng nào khớp bộ lọc.</td></tr>
+                }
+                @foreach (var x in Model.Rows)
+                {
+                    var offline = x.TrangThaiPhong is "MAINTENANCE" or "UNAVAILABLE";
+                    <tr class="hover:bg-surface-container/50 transition-colors @(offline ? "bg-[#FFFDE7]/40" : "")">
+                        <td class="py-2.5 px-3">
+                            <div class="flex items-center gap-2">
+                                <span class="w-8 h-8 rounded bg-surface-container flex items-center justify-center text-primary shrink-0">
+                                    <span class="material-symbols-outlined text-[18px]">@IconLoai(x.LoaiPhong)</span>
+                                </span>
+                                <span class="min-w-0">
+                                    <a href="/PhongHoc/Details/@x.MaPhong" class="font-label-md text-label-md font-bold text-primary block hover:underline">@x.CodePhong</a>
+                                    <span class="text-on-surface-variant text-[11px]">@x.Toa</span>
+                                    @if (x.HienThiDangKyMuon)
+                                    {
+                                        <span class="flex items-center gap-1 text-[10px] font-semibold text-[#28A745] mt-0.5">
+                                            <span class="w-1.5 h-1.5 rounded-full bg-current"></span>Hiển thị trang mượn
+                                        </span>
+                                    }
+                                    else
+                                    {
+                                        <span class="flex items-center gap-1 text-[10px] font-semibold text-outline mt-0.5">
+                                            <span class="w-1.5 h-1.5 rounded-full bg-current"></span>Ẩn khỏi trang mượn
+                                        </span>
+                                    }
+                                </span>
+                            </div>
+                        </td>
+                        <td class="py-2.5 px-3">
+                            <span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold bg-surface-container text-primary border border-secondary-container">
+                                @Catalogs.LabelLoaiPhong(x.LoaiPhong)
+                            </span>
+                        </td>
+                        <td class="py-2.5 px-3 text-center font-semibold">@x.SucChua chỗ</td>
+                        <td class="py-2.5 px-3">
+                            <div class="flex flex-wrap gap-1 max-w-xs text-[11px] text-on-surface-variant">
+                                @if (x.ThietBi.Count == 0)
+                                {
+                                    <span class="text-outline">Chưa gắn thiết bị</span>
+                                }
+                                @foreach (var tb in x.ThietBi)
+                                {
+                                    <span class="bg-surface-container-low px-1.5 py-0.5 rounded border border-surface-variant">@tb</span>
+                                }
+                            </div>
+                        </td>
+                        <td class="py-2.5 px-3 text-center">
+                            <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-semibold border @Sac(x)">
+                                <span class="w-1.5 h-1.5 rounded-full bg-current"></span>@TenTrangThai(x)
+                            </span>
+                            @if (x.CoSuCoMo)
+                            {
+                                <span class="block text-[11px] text-error mt-1">Có sự cố chưa xử lý</span>
+                            }
+                        </td>
+                        <td class="py-2.5 px-3 text-[12px] text-on-surface-variant">
+                            @if (x.GhiChuGanNhat is string chu)
+                            {
+                                <span class="block @(offline ? "text-error font-medium" : "text-on-surface font-medium")">@chu</span>
+                            }
+                            @if (x.GhiChiTietGanNhat is string chiTiet)
+                            {
+                                <span class="text-[11px]">@chiTiet</span>
+                            }
+                            @if (x.GhiChuGanNhat is null && x.GhiChiTietGanNhat is null)
+                            {
+                                <span class="text-outline">Không có lịch hôm nay</span>
+                            }
+                        </td>
+                        @if (laFacility)
+                        {
+                            <td class="py-2.5 px-3">
+                                <div class="flex items-center justify-center gap-1">
+                                    <a href="/PhongHoc/Details/@x.MaPhong" title="Xem chi tiết" class="p-1.5 text-secondary hover:bg-surface-container rounded transition-colors">
+                                        <span class="material-symbols-outlined text-[18px]">visibility</span>
+                                    </a>
+                                    <button type="button" title="Chỉnh sửa" class="sua-phong p-1.5 text-primary hover:bg-surface-container rounded transition-colors cursor-pointer"
+                                            data-ma-phong="@x.MaPhong" data-code-phong="@x.CodePhong" data-ma-toa-nha="@x.MaToaNha"
+                                            data-suc-chua="@x.SucChua" data-loai-phong="@x.LoaiPhong" data-trang-thai="@x.TrangThaiPhong"
+                                            data-hien-thi="@(x.HienThiDangKyMuon ? "1" : "0")"
+                                            data-khung-trong="@string.Join("|", x.KhungTrong)">
+                                        <span class="material-symbols-outlined text-[18px]">edit</span>
+                                    </button>
+                                    <form asp-action="DoiTrangThai" asp-route-id="@x.MaPhong" method="post" class="inline">
+                                        <input type="hidden" name="page" value="@Model.PhanTrang.Trang" />
+                                        <button type="submit" title="Đổi trạng thái: Sẵn sàng → Bảo trì → Ngưng sử dụng" class="p-1.5 @(offline ? "text-[#E67E22]" : "text-secondary") hover:bg-surface-container rounded transition-colors cursor-pointer">
+                                            <span class="material-symbols-outlined text-[18px]">sync_alt</span>
+                                        </button>
+                                    </form>
+                                    <form asp-action="Delete" asp-route-id="@x.MaPhong" method="post" class="inline"
+                                          onsubmit="return confirm('Xóa hẳn phòng @x.CodePhong khỏi danh mục? Phòng còn lịch học hoặc phiếu mượn sẽ không xóa được.');">
+                                        <input type="hidden" name="page" value="@Model.PhanTrang.Trang" />
+                                        <button type="submit" title="Xóa" class="p-1.5 text-error hover:bg-error-container/30 rounded transition-colors cursor-pointer">
+                                            <span class="material-symbols-outlined text-[18px]">delete</span>
+                                        </button>
+                                    </form>
+                                </div>
+                            </td>
+                        }
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+    <div class="border-t border-surface-variant">
+        @await Html.PartialAsync("_PhanTrang", Model.PhanTrang)
+    </div>
+</section>
+
+@if (laFacility)
+{
+    <!-- Modal thêm / sửa phòng -->
+    <div id="roomModal" class="fixed inset-0 z-50 hidden items-center justify-center bg-inverse-surface/50 p-4">
+        <form id="roomForm" method="post" class="bg-surface-container-lowest rounded-lg border border-surface-variant shadow-xl w-full max-w-2xl overflow-hidden">
+            <div class="px-5 py-3.5 bg-primary-container text-on-primary flex items-center justify-between">
+                <div class="flex items-center gap-2">
+                    <span class="material-symbols-outlined text-[20px]">app_registration</span>
+                    <h2 id="modalTitle" class="font-headline-sm text-headline-sm font-bold tracking-tight">Thêm phòng học mới</h2>
+                </div>
+                <button type="button" class="dong-modal text-on-primary-container hover:text-on-primary p-1 rounded-lg hover:bg-primary transition-colors cursor-pointer">
+                    <span class="material-symbols-outlined">close</span>
+                </button>
+            </div>
+
+            <div class="p-5 flex flex-col gap-4 max-h-[calc(85vh-100px)] overflow-y-auto custom-scrollbar">
+                @Html.AntiForgeryToken()
+                <input type="hidden" name="MaPhong" id="fMaPhong" value="0" />
+                <input type="hidden" name="page" value="@Model.PhanTrang.Trang" />
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                        <label class="block font-label-md text-label-md text-on-surface font-semibold mb-1" for="fCodePhong">Mã phòng học <span class="text-error">*</span></label>
+                        <input id="fCodePhong" name="CodePhong" type="text" required placeholder="VD: C.105"
+                               class="w-full h-[36px] px-3 bg-surface-container-lowest border border-surface-variant rounded-lg font-body-sm text-body-sm text-on-surface focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary font-semibold" />
+                    </div>
+                    <div>
+                        <label class="block font-label-md text-label-md text-on-surface font-semibold mb-1" for="fMaToaNha">Tòa nhà / Khu vực</label>
+                        <select id="fMaToaNha" name="MaToaNha" class="w-full h-[36px] px-2.5 bg-surface-container-lowest border border-surface-variant rounded-lg font-body-sm text-body-sm text-on-surface focus:outline-none focus:border-primary">
+                            <option value="">Chưa gán tòa nhà</option>
+                            @foreach (var t in Model.DanhSachToa)
+                            {
+                                <option value="@t.MaToaNha">@t.CodeToaNha — @t.TenToaNha</option>
+                            }
+                        </select>
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block font-label-md text-label-md text-on-surface font-semibold mb-1" for="fSucChua">Sức chứa tối đa <span class="text-error">*</span></label>
+                    <div class="relative w-40">
+                        <input id="fSucChua" name="SucChua" type="number" min="1" max="500" value="40" required
+                               class="w-full h-[36px] pl-3 pr-12 bg-surface-container-lowest border border-surface-variant rounded-lg font-body-sm text-body-sm text-on-surface focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary font-semibold" />
+                        <span class="absolute right-2.5 top-1/2 -translate-y-1/2 text-on-surface-variant text-label-sm">chỗ</span>
+                    </div>
+                </div>
+
+                <div>
+                    <span class="block font-label-md text-label-md text-on-surface font-semibold mb-1">Loại hình phòng đào tạo &amp; CSVC</span>
+                    <div class="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                        @foreach (var lp in Catalogs.LoaiPhong)
+                        {
+                            <label class="loai-tile flex items-center gap-1.5 p-2 rounded-lg border border-surface-variant bg-surface-container-low cursor-pointer hover:bg-surface-container font-body-sm text-body-sm">
+                                <input type="radio" name="LoaiPhong" value="@lp.Key" class="text-primary focus:ring-0" checked="@(lp.Key == "ROOM_THEORY")" />
+                                <span>@lp.Value</span>
+                            </label>
+                        }
+                    </div>
+                </div>
+
+                <div>
+                    <span class="block font-label-md text-label-md text-on-surface font-semibold mb-1">Điều phối trạng thái phòng học</span>
+                    <div class="grid grid-cols-3 gap-2">
+                        <label class="tt-tile flex items-center justify-center gap-1.5 p-2 rounded-lg border border-[#A5D6A7] bg-[#E8F5E9] text-[#28A745] font-semibold text-label-sm cursor-pointer">
+                            <input type="radio" name="TrangThaiPhong" value="AVAILABLE" class="focus:ring-0" checked /><span>Sẵn sàng</span>
+                        </label>
+                        <label class="tt-tile flex items-center justify-center gap-1.5 p-2 rounded-lg border border-[#FFE082] bg-[#FFF8E1] text-[#E67E22] font-semibold text-label-sm cursor-pointer">
+                            <input type="radio" name="TrangThaiPhong" value="MAINTENANCE" class="focus:ring-0" /><span>Bảo trì</span>
+                        </label>
+                        <label class="tt-tile flex items-center justify-center gap-1.5 p-2 rounded-lg border border-outline-variant bg-surface-container text-on-surface-variant font-semibold text-label-sm cursor-pointer">
+                            <input type="radio" name="TrangThaiPhong" value="UNAVAILABLE" class="focus:ring-0" /><span>Ngưng sử dụng</span>
+                        </label>
+                    </div>
+                    <p class="text-[11px] text-on-surface-variant mt-1.5">
+                        Chọn <strong>Bảo trì</strong> hoặc <strong>Ngưng sử dụng</strong> thì phòng lập tức ẩn khỏi trang đăng ký mượn phòng và mọi phiếu mới cho phòng đó sẽ bị chặn.
+                    </p>
+                </div>
+
+                <div class="border-t border-surface-variant pt-3">
+                    <div id="fKhungWrap">
+                        <span class="block font-label-md text-label-md text-on-surface font-semibold mb-1">Khung giờ phòng trống</span>
+                        <p class="text-[11px] text-on-surface-variant mb-2">
+                            Mỗi dòng là một khoảng giờ phòng sẵn sàng cho mượn, ví dụ 07:00 – 11:25. Giảng viên và sinh viên chỉ đặt được khung giờ nằm trọn trong các khoảng này.
+                        </p>
+                        <table class="w-full text-sm">
+                            <thead>
+                                <tr class="text-left text-[11px] text-on-surface-variant">
+                                    <th class="pb-1 w-8">#</th>
+                                    <th class="pb-1">Trống từ</th>
+                                    <th class="pb-1">Đến</th>
+                                    <th class="pb-1 w-12"></th>
+                                </tr>
+                            </thead>
+                            <tbody id="fDsKhung"></tbody>
+                        </table>
+                        <button type="button" id="fThemKhung"
+                                class="mt-2 px-3 py-1.5 rounded-lg border border-outline-variant hover:bg-surface-container text-sm font-semibold transition-colors cursor-pointer">
+                            + Thêm khung giờ
+                        </button>
+                        <p class="text-[11px] text-outline mt-1">Dòng để trống hai ô giờ sẽ được bỏ qua khi lưu.</p>
+
+                        <template id="fMauKhung">
+                            <tr>
+                                <td class="py-2 text-on-surface-variant"></td>
+                                <td class="py-2"><input name="KhungTrong[0].Tu" type="text" data-gio inputmode="numeric" maxlength="8" autocomplete="off" placeholder="HH:mm" class="rounded-lg bg-surface-container-low px-2 py-1 border border-outline-variant" /></td>
+                                <td class="py-2"><input name="KhungTrong[0].Den" type="text" data-gio inputmode="numeric" maxlength="8" autocomplete="off" placeholder="HH:mm" class="rounded-lg bg-surface-container-low px-2 py-1 border border-outline-variant" /></td>
+                                <td class="py-2 text-right"><button type="button" class="xoa-khung text-error text-xs font-semibold">Xóa</button></td>
+                            </tr>
+                        </template>
+                    </div>
+
+                    <label class="mt-3 flex items-start gap-2.5 p-3 rounded-lg border border-surface-variant bg-surface-container-low cursor-pointer">
+                        <input id="fHienThi" name="HienThiDangKyMuon" type="checkbox" value="true" checked
+                               class="mt-0.5 w-4 h-4 rounded border-outline text-primary focus:ring-primary" />
+                        <input type="hidden" name="HienThiDangKyMuon" value="false" />
+                        <span>
+                            <span class="block font-label-md text-label-md text-on-surface font-semibold">Đăng phòng lên trang đăng ký mượn</span>
+                            <span class="block text-[11px] text-on-surface-variant mt-0.5">
+                                Khi tích, giảng viên và sinh viên thấy phòng này để đăng ký mượn theo khung giờ trống bên trên.
+                                Không tích, phòng bị ẩn hoàn toàn và không nhận phiếu mượn mới.
+                            </span>
+                        </span>
+                    </label>
+                </div>
+            </div>
+
+            <div class="px-5 py-3 bg-surface-container-low border-t border-surface-variant flex items-center justify-end gap-2.5">
+                <button type="button" class="dong-modal px-4 py-2 bg-surface-container-lowest text-on-surface-variant hover:bg-surface-variant border border-surface-variant rounded-lg font-label-md text-label-md font-semibold transition-colors cursor-pointer">Hủy bỏ</button>
+                <button type="submit" class="px-5 py-2 bg-primary-container text-on-primary hover:bg-primary rounded-lg font-label-md text-label-md font-bold shadow-sm transition-all flex items-center gap-1.5 cursor-pointer">
+                    <span class="material-symbols-outlined text-[18px]">save</span><span>Lưu cấu hình</span>
+                </button>
+            </div>
+        </form>
+    </div>
+}
+
+@section Scripts {
+    @if (laFacility)
+    {
+        <script>
+            (() => {
+                const modal = document.getElementById('roomModal');
+                const form = document.getElementById('roomForm');
+                const title = document.getElementById('modalTitle');
+                const moModal = () => { modal.classList.remove('hidden'); modal.classList.add('flex'); };
+                const dongModal = () => { modal.classList.add('hidden'); modal.classList.remove('flex'); };
+
+                const chonRadio = (name, value) => document.querySelectorAll(`[name="${name}"]`).forEach(r => { r.checked = r.value === value; });
+
+                const fHienThi = document.getElementById('fHienThi');
+                const fKhungWrap = document.getElementById('fKhungWrap');
+                const fDsKhung = document.getElementById('fDsKhung');
+                const fMauKhung = document.getElementById('fMauKhung');
+                const macDinhKhung = @Html.Raw(khungMacDinhJson);
+
+                const taoHangKhung = (tu, den) => {
+                    const tao = document.createElement('template');
+                    tao.innerHTML = fMauKhung.innerHTML.trim();
+                    const hang = tao.content.firstElementChild;
+                    hang.querySelector('input[name$=".Tu"]').value = tu || '';
+                    hang.querySelector('input[name$=".Den"]').value = den || '';
+                    return hang;
+                };
+
+                const danhSoLaiKhung = () => {
+                    [...fDsKhung.rows].forEach((hang, i) => {
+                        hang.cells[0].textContent = i + 1;
+                        hang.querySelector('input[name$=".Tu"]').name = `KhungTrong[${i}].Tu`;
+                        hang.querySelector('input[name$=".Den"]').name = `KhungTrong[${i}].Den`;
+                    });
+                    fDsKhung.querySelectorAll('.xoa-khung').forEach(nut => nut.disabled = fDsKhung.rows.length <= 1);
+                };
+
+                const veKhung = (ds) => {
+                    fDsKhung.innerHTML = '';
+                    const nguon = ds && ds.length ? ds : macDinhKhung;
+                    nguon.forEach(([tu, den]) => fDsKhung.appendChild(taoHangKhung(tu, den)));
+                    danhSoLaiKhung();
+                };
+
+                const capNhatHienThiKhung = () => {
+                    const hien = fHienThi.checked;
+                    fKhungWrap.classList.toggle('hidden', !hien);
+                    fDsKhung.querySelectorAll('input').forEach(i => i.disabled = !hien);
+                };
+
+                fHienThi.addEventListener('change', capNhatHienThiKhung);
+                document.getElementById('fThemKhung').addEventListener('click', () => {
+                    fDsKhung.appendChild(taoHangKhung('', ''));
+                    danhSoLaiKhung();
+                });
+                fDsKhung.addEventListener('click', e => {
+                    if (!e.target.classList.contains('xoa-khung')) return;
+                    e.target.closest('tr').remove();
+                    danhSoLaiKhung();
+                });
+
+                const mo = (d, sua) => {
+                    document.getElementById('fMaPhong').value = sua ? d.maPhong : '0';
+                    document.getElementById('fCodePhong').value = sua ? d.codePhong : '';
+                    document.getElementById('fSucChua').value = sua ? d.sucChua : '40';
+                    const maToa = d.maToaNha;
+                    document.getElementById('fMaToaNha').value = maToa && document.querySelector(`#fMaToaNha option[value="${maToa}"]`) ? String(maToa) : '';
+                    chonRadio('LoaiPhong', sua ? d.loaiPhong : 'ROOM_THEORY');
+                    chonRadio('TrangThaiPhong', sua ? d.trangThai : 'AVAILABLE');
+
+                    fHienThi.checked = sua ? d.hienThi === '1' : true;
+                    const khung = sua && d.khungTrong ? d.khungTrong.split('|').map(x => x.split('-')) : null;
+                    veKhung(khung);
+                    capNhatHienThiKhung();
+
+                    form.action = sua ? '/PhongHoc/Edit' : '/PhongHoc/Create';
+                    title.textContent = sua ? `Cấu hình phòng học: ${d.codePhong}` : 'Thêm phòng học mới';
+                    moModal();
+                };
+
+                document.querySelector('.them-phong')?.addEventListener('click', () => mo({}, false));
+                document.querySelectorAll('.sua-phong').forEach(b => b.addEventListener('click', () => mo(b.dataset, true)));
+                document.querySelectorAll('.dong-modal').forEach(b => b.addEventListener('click', dongModal));
+                modal.addEventListener('click', e => { if (e.target === modal) dongModal(); });
+                document.addEventListener('keydown', e => { if (e.key === 'Escape') dongModal(); });
+
+                // Đến từ trang tòa nhà: mở sẵn form thêm phòng và chọn đúng tòa.
+                const moThem = @(ViewBag.MoThemPhong == true ? "true" : "false");
+                const toaChon = @(ViewBag.ToaChonSan?.ToString() ?? "null");
+                if (moThem) mo({ maToaNha: toaChon }, false);
+            })();
+        </script>
+    }
+}

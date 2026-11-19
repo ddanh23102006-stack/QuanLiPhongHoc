@@ -1,0 +1,19 @@
+@model ToaNhaFormVm
+@{
+    ViewData["Title"] = "Thêm tòa nhà";
+}
+<div class="flex flex-wrap items-center justify-between gap-space-md mb-space-md">
+  <div>
+    <div class="text-xs text-on-surface-variant">CSVC / <a class="text-primary" href="/ToaNha">Tòa nhà</a> / <span class="font-bold">Thêm mới</span></div>
+    <h1 class="text-xl font-bold">Thêm tòa nhà</h1>
+  </div>
+  <a class="px-3 py-2 rounded-lg bg-surface-container text-on-surface font-semibold text-sm" href="/ToaNha">← Danh sách</a>
+</div>
+
+<form asp-action="Create" method="post" class="bg-surface-container-lowest rounded-xl shadow-sm p-space-lg max-w-3xl">
+  <partial name="_Form" model="Model" />
+  <div class="flex gap-2 mt-space-lg">
+    <button type="submit" class="px-4 py-2 rounded-lg bg-primary-container text-on-primary font-semibold text-sm">Lưu tòa nhà</button>
+    <a class="px-4 py-2 rounded-lg bg-surface-container text-on-surface font-semibold text-sm" href="/ToaNha">Hủy</a>
+  </div>
+</form>

@@ -1,0 +1,16 @@
+@model DonXinNghiFormVm
+@{ ViewData["Title"] = "Gửi đơn nghỉ"; }
+<h1 class="text-xl font-bold mb-space-md">Đăng ký nghỉ dạy / dạy bù</h1>
+<form asp-action="Create" method="post" class="bg-surface-container-lowest p-space-lg rounded-xl max-w-xl space-y-3 shadow-sm">
+  <label class="block text-sm">Học phần <select asp-for="MaHocPhan" asp-items="ViewBag.HocPhans" class="mt-1 w-full rounded-lg bg-surface-container-low px-3 py-2"></select></label>
+  <label class="block text-sm">Lý do <textarea asp-for="LyDo" class="mt-1 w-full rounded-lg bg-surface-container-low px-3 py-2"></textarea></label>
+  <label class="block text-sm">Phương án
+    <select asp-for="PhuongAnGiaiQuyet" class="mt-1 w-full rounded-lg bg-surface-container-low px-3 py-2" id="pa">
+      <option value="MAKEUP_CLASS">Dạy bù</option>
+      <option value="SUBSTITUTE_TEACHER">Giảng viên dạy thay</option>
+      <option value="STAFF_ASSIGN">Đào tạo phân công</option>
+    </select>
+  </label>
+  <label class="block text-sm" id="gv-wrap">GV dạy thay <select asp-for="MaGiangVienDayThay" asp-items="ViewBag.Gvs" class="mt-1 w-full rounded-lg bg-surface-container-low px-3 py-2"></select></label>
+  <button class="px-4 py-2 bg-primary-container text-on-primary rounded-lg font-semibold">Gửi đơn</button>
+</form>

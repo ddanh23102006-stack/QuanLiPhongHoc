@@ -1,0 +1,102 @@
+@model IEnumerable<PhongThietBi>
+@{
+    var tb = ViewBag.ThietBi as ThietBi;
+    ViewData["Title"] = tb?.TenThietBi ?? "Thiết bị";
+    var ds = Model.ToList();
+    string MauTrangThai(string tt) => tt switch
+    {
+        "GOOD" => "bg-tertiary-container/15 text-tertiary",
+        "NEEDS_REPAIR" or "REPAIRING" => "bg-amber-50 text-amber-700 border border-amber-300",
+        "RETIRED" => "bg-surface-container text-on-surface-variant",
+        _ => "bg-error-container text-on-error-container"
+    };
+}
+<div class="flex flex-wrap items-center justify-between gap-space-md mb-space-md">
+  <div>
+    <div class="text-xs text-on-surface-variant">CSVC / <a class="text-primary" href="/ThietBi">Thiết bị</a> / <span class="font-bold">@tb?.TenThietBi</span></div>
+    <h1 class="text-xl font-bold">@tb?.TenThietBi</h1>
+    <p class="text-sm text-on-surface-variant mt-1">
+      Mã: <span class="font-mono font-semibold">@(tb?.MaCodeThietBi ?? "—")</span> ·
+      @(string.IsNullOrEmpty(tb?.LoaiPhong) ? "Mọi loại phòng" : Catalogs.LabelLoaiPhong(tb?.LoaiPhong))
+    </p>
+  </div>
+  <div class="flex flex-wrap items-center gap-2">
+    <a class="px-3 py-2 rounded-lg bg-tertiary-container text-on-tertiary font-semibold text-sm" href="/ThietBi/XuatBaoCao/@tb?.MaThietBi">Xuất báo cáo Excel</a>
+    <a class="px-3 py-2 rounded-lg bg-surface-container text-on-surface font-semibold text-sm" href="/ThietBi/Edit/@tb?.MaThietBi">Sửa thông tin</a>
+    <a class="px-3 py-2 rounded-lg bg-surface-container text-on-surface font-semibold text-sm" href="/ThietBi">← Danh sách</a>
+  </div>
+</div>
+
+<div class="grid grid-cols-2 lg:grid-cols-4 gap-space-md mb-space-md">
+  <div class="bg-surface-container-lowest rounded-xl p-space-lg shadow-sm">
+    <div class="text-xs uppercase text-on-surface-variant font-semibold">Tổng thiết bị</div>
+    <div class="text-2xl font-bold mt-1">@ds.Count</div>
+  </div>
+  <div class="bg-surface-container-lowest rounded-xl p-space-lg shadow-sm">
+    <div class="text-xs uppercase text-on-surface-variant font-semibold">Đang phân bổ</div>
+    <div class="text-2xl font-bold text-primary mt-1">@ds.Count(x => x.MaPhong != null)</div>
+  </div>
+  <div class="bg-surface-container-lowest rounded-xl p-space-lg shadow-sm">
+    <div class="text-xs uppercase text-on-surface-variant font-semibold">Trong kho</div>
+    <div class="text-2xl font-bold mt-1">@ds.Count(x => x.MaPhong == null)</div>
+    <p class="text-xs text-on-surface-variant mt-1">Chưa gán phòng</p>
+  </div>
+  <div class="bg-surface-container-lowest rounded-xl p-space-lg shadow-sm">
+    <div class="text-xs uppercase text-on-surface-variant font-semibold">Cần xử lý</div>
+    <div class="text-2xl font-bold text-error mt-1">@ds.Count(x => Catalogs.ThietBiCanXuLy(x.TrangThai))</div>
+    <p class="text-xs text-on-surface-variant mt-1">Thiết bị hỏng hoặc đang sửa chữa</p>
+  </div>
+</div>
+
+<div class="bg-surface-container-lowest rounded-xl shadow-sm overflow-hidden">
+<div class="overflow-x-auto">
+<table class="w-full text-sm">
+  <thead class="bg-surface-container text-left">
+    <tr>
+      <th class="p-3">Vị trí</th>
+      <th class="p-3">Tòa nhà</th>
+      <th class="p-3">Nhãn nhận diện</th>
+      <th class="p-3">Trạng thái</th>
+    </tr>
+  </thead>
+  <tbody>
+  @foreach (var ptb in ds)
+  {
+    <tr class="border-t border-surface-container align-top">
+      <td class="p-3 font-semibold">
+        @if (ptb.MaPhong != null)
+        {
+          <a class="text-primary" href="/PhongHoc/Details/@ptb.MaPhong">@ptb.PhongHoc?.CodePhong</a>
+        }
+        else
+        {
+          <span class="px-2 py-0.5 rounded bg-surface-container text-on-surface-variant text-xs font-semibold">Trong kho</span>
+        }
+      </td>
+      <td class="p-3">@(ptb.PhongHoc?.ToaNha?.CodeToaNha ?? "—")</td>
+      <td class="p-3">@ptb.NhanDienThietBi</td>
+      <td class="p-3">
+        <span class="px-2 py-0.5 rounded text-xs font-semibold @MauTrangThai(ptb.TrangThai)">@Catalogs.Label(Catalogs.TrangThaiThietBi, ptb.TrangThai)</span>
+        <form asp-controller="PhongHoc" asp-action="CapNhatThietBi" method="post" class="mt-1 flex items-center gap-1">
+          <input type="hidden" name="maPhongThietBi" value="@ptb.MaPhongThietBi" />
+          <input type="hidden" name="returnUrl" value="/ThietBi/Details/@tb?.MaThietBi" />
+          <select name="trangThai" class="rounded bg-surface-container-low text-xs px-1.5 py-1">
+            @foreach (var kv in Catalogs.TrangThaiThietBi)
+            {
+              <option value="@kv.Key" selected="@(kv.Key == ptb.TrangThai)">@kv.Value</option>
+            }
+          </select>
+          <button class="text-primary text-xs font-semibold">Lưu</button>
+        </form>
+      </td>
+    </tr>
+  }
+  @if (ds.Count == 0)
+  {
+    <tr><td colspan="4" class="p-6 text-center text-on-surface-variant">Loại thiết bị này chưa có bản ghi nào.</td></tr>
+  }
+  </tbody>
+</table>
+</div>
+</div>
+

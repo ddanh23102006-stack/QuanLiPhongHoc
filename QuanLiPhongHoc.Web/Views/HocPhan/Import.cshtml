@@ -1,0 +1,107 @@
+@model ImportResult
+@{
+    ViewData["Title"] = "Nhập học phần từ Excel";
+    var daChay = Model.Inserted > 0 || Model.Updated > 0 || Model.Skipped > 0 || Model.Errors.Count > 0;
+}
+<div class="flex flex-wrap items-center justify-between gap-space-md mb-space-md">
+  <div>
+    <div class="text-xs text-on-surface-variant">Đào tạo / <a class="text-primary" href="/HocPhan">Học phần</a> / <span class="font-bold">Nhập Excel</span></div>
+    <h1 class="text-xl font-bold">Nhập danh sách lớp học phần từ Excel</h1>
+  </div>
+  <div class="flex gap-2">
+    <a class="px-3 py-2 rounded-lg bg-surface-container text-on-surface font-semibold text-sm" href="/HocPhan/Template">
+      <span class="material-symbols-outlined text-[18px] align-middle">download</span> Tải tệp mẫu
+    </a>
+    <a class="px-3 py-2 rounded-lg bg-surface-container text-on-surface font-semibold text-sm" href="/HocPhan">
+      <span class="material-symbols-outlined text-[18px] align-middle">menu_book</span> Danh mục học phần
+    </a>
+  </div>
+</div>
+
+<form asp-action="Import" method="post" enctype="multipart/form-data" class="bg-surface-container-lowest rounded-xl shadow-sm p-space-lg max-w-3xl">
+  <div asp-validation-summary="ModelOnly" class="text-error text-sm mb-space-md"></div>
+  <p class="text-sm text-on-surface-variant mb-space-md">
+    Tệp phải có định dạng <b>.xlsx</b>. Hệ thống nhận diện cột theo <b>tên tiêu đề</b> (tiêu đề có thể nằm ở bất kỳ dòng nào), hỗ trợ 2 định dạng:
+  </p>
+  <ul class="text-sm text-on-surface-variant mb-space-md list-disc pl-5 space-y-1">
+   
+    <li>
+      Chuẩn file excel:
+      <code class="px-1.5 py-0.5 rounded bg-surface-container font-mono text-xs">Mã Lớp HP</code>
+      <code class="px-1.5 py-0.5 rounded bg-surface-container font-mono text-xs">Tên Môn Học</code>
+      <code class="px-1.5 py-0.5 rounded bg-surface-container font-mono text-xs">Sĩ Số</code>
+      <code class="px-1.5 py-0.5 rounded bg-surface-container font-mono text-xs">Giảng Viên Giảng Dạy</code>
+      <code class="px-1.5 py-0.5 rounded bg-surface-container font-mono text-xs">Loại Phòng Yêu Cầu</code>
+      <span class="block text-xs">Cột “Loại Phòng Yêu Cầu”: <i>Phòng Lý thuyết</i> → lớp lý thuyết; các loại phòng còn lại → lớp thực hành (nhóm CNTT).</span>
+    </li>
+  </ul>
+  <p class="text-sm text-on-surface-variant mb-space-md">
+    Học phần đã tồn tại sẽ được cập nhật, chưa có sẽ được thêm mới. Giảng viên khớp theo mã hoặc tên;
+    tên chưa có trong hệ thống sẽ được <b>tạo tài khoản giảng viên mới</b>. Nhập xong hệ thống tự chuyển sang danh mục học phần để rà soát.
+  </p>
+  <div class="mb-space-md rounded-lg border border-primary/20 bg-primary-container/10 px-3 py-2 text-sm text-on-surface">
+    Chọn <b>Làm mới dữ liệu</b> sẽ xóa các học phần và lịch đã lưu để bắt đầu đợt mới.
+  </div>
+  <input type="file" name="file" accept=".xlsx" required
+         class="block w-full text-sm rounded-lg bg-surface-container-low px-3 py-2 border border-outline-variant" />
+  <div class="flex flex-wrap gap-2 mt-space-lg">
+    <button type="submit" class="px-4 py-2 rounded-lg bg-primary-container text-on-primary font-semibold text-sm">
+      <span class="material-symbols-outlined text-[18px] align-middle">upload_file</span> Bắt đầu nhập
+    </button>
+    <button type="submit" form="resetForm"
+            class="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-error-container text-on-error-container font-semibold text-sm"
+            onclick="return confirm('XÓA TOÀN BỘ lịch đã xếp và học phần hiện có để import dữ liệu mới? Hành động không thể hoàn tác.');">
+      <span class="material-symbols-outlined text-[18px]">restart_alt</span> Làm mới dữ liệu (xóa lịch + học phần)
+    </button>
+    <a href="/LichHoc" class="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-surface-container text-on-surface font-semibold text-sm">
+      <span class="material-symbols-outlined text-[18px]">arrow_back</span> Hủy / Quay về TKB tuần
+    </a>
+  </div>
+</form>
+
+<form id="resetForm" asp-action="ResetAll" method="post" class="hidden">
+  @Html.AntiForgeryToken()
+</form>
+
+@if (daChay)
+{
+  <section class="mt-space-lg space-y-space-md">
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-space-md">
+      <div class="bg-surface-container-lowest rounded-xl p-space-lg shadow-sm">
+        <div class="text-xs uppercase text-on-surface-variant font-semibold">Thêm mới</div>
+        <div class="text-2xl font-bold text-tertiary mt-1">@Model.Inserted</div>
+      </div>
+      <div class="bg-surface-container-lowest rounded-xl p-space-lg shadow-sm">
+        <div class="text-xs uppercase text-on-surface-variant font-semibold">Cập nhật</div>
+        <div class="text-2xl font-bold text-primary mt-1">@Model.Updated</div>
+      </div>
+      <div class="bg-surface-container-lowest rounded-xl p-space-lg shadow-sm">
+        <div class="text-xs uppercase text-on-surface-variant font-semibold">Bỏ qua (trống)</div>
+        <div class="text-2xl font-bold mt-1">@Model.Skipped</div>
+      </div>
+      <div class="bg-surface-container-lowest rounded-xl p-space-lg shadow-sm">
+        <div class="text-xs uppercase text-on-surface-variant font-semibold">Dòng lỗi</div>
+        <div class="text-2xl font-bold text-error mt-1">@Model.Errors.Count</div>
+      </div>
+    </div>
+
+    @if (Model.Errors.Count > 0)
+    {
+      <div class="bg-surface-container-lowest rounded-xl shadow-sm overflow-x-auto">
+        <div class="p-space-lg font-semibold text-error">Chi tiết dòng lỗi</div>
+        <table class="w-full text-sm">
+          <thead class="bg-surface-container text-left"><tr><th class="p-3">Dòng</th><th class="p-3">Nội dung lỗi</th></tr></thead>
+          <tbody>
+          @foreach (var e in Model.Errors)
+          {
+            <tr class="border-t border-surface-container">
+              <td class="p-3 font-mono">@e.Row</td>
+              <td class="p-3 text-on-surface-variant">@e.Message</td>
+            </tr>
+          }
+          </tbody>
+        </table>
+      </div>
+    }
+  </section>
+}

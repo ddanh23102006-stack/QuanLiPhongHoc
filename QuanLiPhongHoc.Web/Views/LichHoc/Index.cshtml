@@ -1,0 +1,794 @@
+@model IEnumerable<LichHoc>
+@{
+    ViewData["Title"] = "Thờikhoabiểu";
+    var weekStart = (DateOnly)ViewBag.WeekStart;
+    var weekEnd = (DateOnly)ViewBag.WeekEnd;
+    var prevWeek = (DateOnly)ViewBag.PrevWeek;
+    var nextWeek = (DateOnly)ViewBag.NextWeek;
+    int? building = ViewBag.Building as int?;
+    var loai = ViewBag.Loai as string;
+    var buildings = ViewBag.Buildings as List<ToaNha> ?? new List<ToaNha>();
+    var phongOptions = ViewBag.Phongs as IEnumerable<PhongHoc> ?? [];
+    var giangVienOptions = ViewBag.GiangViens as IEnumerable<NguoiDung> ?? [];
+    var canEdit = User.IsInRole(AppRoles.Training);
+    var laGiangVien = User.IsInRole(AppRoles.Lecturer) && !canEdit;
+    var days = Enumerable.Range(0, 7).Select(i => weekStart.AddDays(i)).ToList();
+    var today = DateOnly.FromDateTime(DateTime.Today);
+    // Danh sách tuần cho bộ chọn (hiển thị kèm khoảng ngày, theo mẫu giao diện).
+    var tuanOptions = Enumerable.Range(-26, 53).Select(i => weekStart.AddDays(i * 7)).ToList();
+    int TuanSo(DateOnly d) => System.Globalization.ISOWeek.GetWeekOfYear(d.ToDateTime(TimeOnly.MinValue));
+    // Khung tiết chuẩn lấy từ cấu hình ca học đang áp dụng (nhân viên đào tạo có thể sửa & lưu).
+    var tietKhung = Catalogs.CaHocSettings
+        .Select(c => (Code: c.Code, Time: c.TimeRange, Tiet: c.Tiet, Span: c.SoTiet))
+        .ToArray();
+    string GioCa(string? code) => Catalogs.GetCaTime(code) is { } range
+        ? $"{range.Start:HH\\:mm} → {range.End:HH\\:mm}"
+        : "";
+    string GioTiet(int tiet)
+    {
+        var ca = Catalogs.CaLyThuyet.FirstOrDefault(x => x.Tiet <= tiet && tiet < x.Tiet + x.SoTiet)
+                 ?? Catalogs.CaThucHanh.FirstOrDefault(x => x.Tiet <= tiet && tiet < x.Tiet + x.SoTiet);
+        if (ca is null || ca.SoTiet <= 0 || ca.GioBatDau is not { } batDau || ca.GioKetThuc is not { } ketThuc)
+            return $"Tiết {tiet}";
+
+        var doDaiTiet = TimeSpan.FromTicks((ketThuc - batDau).Ticks / ca.SoTiet);
+        return batDau.Add(TimeSpan.FromTicks(doDaiTiet.Ticks * (tiet - ca.Tiet))).ToString("HH:mm");
+    }
+    var tracks = tietKhung.Where(c => c.Span == 3).ToArray();
+    // Mỗi ca phủ đúng số tiết của nó; ca thực hành 5 tiết (tiết 1-5 / 7-11).
+    var slotsByDay = days.ToDictionary(d => d, d =>
+    {
+        var slots = new List<(int Start, int Span, List<LichHoc> Items)>();
+        foreach (var ca in tietKhung)
+        {
+            var items = Model.Where(x => x.NgayHoc == d && x.CaHoc == ca.Code).ToList();
+            if (items.Count > 0) slots.Add((ca.Tiet, ca.Span, items));
+        }
+        slots.Sort((a, b) => a.Start.CompareTo(b.Start));
+        return slots;
+    });
+    string DayName(DayOfWeek d) => d switch
+    {
+        DayOfWeek.Monday => "Thứ 2",
+        DayOfWeek.Tuesday => "Thứ 3",
+        DayOfWeek.Wednesday => "Thứ 4",
+        DayOfWeek.Thursday => "Thứ 5",
+        DayOfWeek.Friday => "Thứ 6",
+        DayOfWeek.Saturday => "Thứ 7",
+        _ => "Chủ Nhật"
+    };
+    string WeekUrl(DateOnly w)
+        => $"/LichHoc?week={w:yyyy-MM-dd}" + (building is null ? "" : $"&building={building}")
+           + (string.IsNullOrWhiteSpace(loai) ? "" : $"&loai={loai}");
+    string NhomPhong(PhongHoc p) => p.LoaiPhong == Catalogs.SanTheDucNgoaiTroi
+        ? "sports"
+        : p.LoaiPhong == Catalogs.RoomTheory ? "theory"
+        : Catalogs.LaPhongThucHanh(p.LoaiPhong) ? "practice" : "other";
+    string LoaiUrl(string? kind)
+        => $"/LichHoc?week={weekStart:yyyy-MM-dd}" + (building is null ? "" : $"&building={building}")
+           + (string.IsNullOrWhiteSpace(kind) ? "" : $"&loai={kind}");
+    var countAll = (int)ViewBag.CountAll;
+    var countTheory = (int)ViewBag.CountTheory;
+    var countPractice = (int)ViewBag.CountPractice;
+    var countCancelled = (int)ViewBag.CountCancelled;
+    var totalRooms = (int)(ViewBag.TotalRooms ?? 0);
+    var page = (int)(ViewBag.Page ?? 1);
+    var soTrang = (int)(ViewBag.SoTrang ?? 1);
+    var tongSo = (int)(ViewBag.TongSo ?? countAll);
+    var tuCa = (int)(ViewBag.TuCa ?? 1);
+    var denCa = (int)(ViewBag.DenCa ?? tongSo);
+    string Trang(int p) => $"/LichHoc?week={weekStart:yyyy-MM-dd}" + (building is null ? "" : $"&building={building}") + $"&loai={loai}&page={p}";
+}
+
+<div class="flex flex-col gap-4">
+    <!-- Breadcrumb + header -->
+    <div class="flex flex-wrap items-center justify-between gap-3">
+        <div class="flex flex-col gap-1">
+            <div class="flex items-center gap-1.5 text-body-sm text-on-surface-variant">
+                <span class="material-symbols-outlined text-sm text-primary">home</span>
+                <span>Trang chủ</span>
+                <span>/</span>
+                <span class="text-on-surface font-medium">@(canEdit ? "Nhân viên đào tạo" : laGiangVien ? "Giảng viên" : "Sinh viên")</span>
+                <span>/</span>
+                <span class="font-semibold text-primary">Thời khóa biểu dạng tuần</span>
+            </div>
+        </div>
+        <div class="flex flex-wrap items-center gap-2">
+            <span class="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-surface-container text-[11px] text-primary font-semibold">
+                <span class="w-2 h-2 rounded-full bg-tertiary animate-pulse"></span>
+                Hệ thống đồng bộ: Trực tiếp (@DateTime.Now.ToString("HH:mm:ss"))
+            </span>
+            @if (canEdit)
+            {
+                <a href="/LichHoc/Export?week=@weekStart.ToString("yyyy-MM-dd")@(building is null ? "" : $"&building={building}")@(string.IsNullOrEmpty(loai) ? "" : $"&loai={loai}")"
+                   class="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-primary text-on-primary text-xs font-bold shadow-sm hover:brightness-110 transition-all">
+                    <span class="material-symbols-outlined text-[16px]">download</span> Xuất Excel/PDF
+                </a>
+            }
+        </div>
+    </div>
+
+    <!-- Actions (chỉ nhân viên đào tạo) -->
+    @if (canEdit)
+    {
+        <div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-3 shadow-sm flex flex-col gap-2">
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-2">
+                <button type="button" onclick="document.getElementById('caModal').showModal()"
+                        class="flex items-center justify-center gap-2 px-3 py-2.5 rounded-lg border border-outline-variant bg-surface-container-lowest text-sm font-semibold text-primary hover:bg-surface-container-low transition-colors">
+                    <span class="material-symbols-outlined text-[18px]">settings</span> Cấu hình giờ &amp; Ca học
+                </button>
+                <a href="/HocPhan/Import"
+                   class="flex items-center justify-center gap-2 px-3 py-2.5 rounded-lg border border-outline-variant bg-surface-container-lowest text-sm font-semibold text-primary hover:bg-surface-container-low transition-colors">
+                    <span class="material-symbols-outlined text-[18px]">upload_file</span> Nhập tệp Excel
+                </a>
+                <a href="/HocPhan"
+                   class="flex items-center justify-center gap-2 px-3 py-2.5 rounded-lg border border-outline-variant bg-surface-container-lowest text-sm font-semibold text-primary hover:bg-surface-container-low transition-colors">
+                    <span class="material-symbols-outlined text-[18px]">menu_book</span> Danh mục học phần
+                </a>
+                <a href="/HocPhan/AutoSchedule"
+                   class="flex items-center justify-center gap-2 px-3 py-2.5 rounded-lg bg-primary text-on-primary text-sm font-bold shadow-sm hover:brightness-110 transition-all">
+                    <span class="material-symbols-outlined text-[18px]">auto_awesome</span> Xếp TKB Tự Động
+                </a>
+            </div>
+            <a href="/LichHoc/Create"
+               class="flex items-center justify-center gap-2 px-3 py-2 rounded-lg bg-secondary text-on-secondary text-sm font-semibold hover:brightness-110 transition-all">
+                <span class="material-symbols-outlined text-[18px]">add_box</span> Xếp thủ công / Điều phối nhanh
+            </a>
+        </div>
+    }
+
+    <!-- Tabs (chỉ nhân viên đào tạo) -->
+    @if (canEdit)
+    {
+        <div class="flex flex-wrap items-center gap-2">
+            @{
+                var tabs = new List<(string? Key, string Label, int Count, string Icon)>
+                {
+                    (null, "Tất cả", countAll, "apps"),
+                    ("theory", "Lý thuyết", countTheory, "menu_book"),
+                    ("practice", "Thực hành & GDTC", countPractice, "science")
+                };
+            }
+            @foreach (var tab in tabs)
+            {
+                var active = loai == tab.Key || (string.IsNullOrEmpty(loai) && tab.Key is null);
+                <a href="@LoaiUrl(tab.Key)"
+                   class="flex items-center gap-2 px-3.5 py-2 rounded-full text-sm transition-all @(active ? "bg-primary text-on-primary font-bold shadow-sm" : "bg-surface-container-lowest border border-outline-variant text-on-surface-variant hover:border-primary hover:text-primary")">
+                    <span class="material-symbols-outlined text-[18px]">@tab.Icon</span>
+                    @tab.Label
+                    <span class="px-1.5 py-0.5 rounded-full text-[11px] font-semibold @(active ? "bg-white/20 text-on-primary" : "bg-white text-on-surface-variant")">@tab.Count</span>
+                </a>
+            }
+        </div>
+    }
+
+    <!-- Bộ lọc + chú thích (bố cục theo mẫu xem thời khóa biểu) -->
+    <div class="bg-white rounded border border-[#D0E4F5] p-3 shadow-sm" id="timetable-view">
+        <div class="flex items-center gap-2 pb-2.5 mb-3 border-b border-[#D0E4F5]">
+            <span class="material-symbols-outlined text-[#086A9F] text-xl">settings</span>
+            <h2 class="text-[#086A9F] font-bold text-sm tracking-wide uppercase">THỜI KHÓA BIỂU DẠNG TUẦN</h2>
+        </div>
+        <form method="get" class="flex flex-col gap-3">
+            <input type="hidden" name="loai" value="@loai" />
+            <!-- Hàng 1: tòa nhà + tuần -->
+            <div class="flex flex-wrap items-center gap-3">
+                <select name="building" onchange="this.form.submit()" class="h-[34px] w-full sm:w-auto bg-white border border-[#B9D9EB] rounded px-3 text-xs text-on-surface focus:outline-none focus:border-primary-container sm:min-w-[240px]">
+                    <option value="">Tất cả tòa nhà</option>
+                    @foreach (var t in buildings)
+                    {
+                        if (building == t.MaToaNha)
+                        {
+                            <option value="@t.MaToaNha" selected>@t.CodeToaNha@(string.IsNullOrEmpty(t.TenToaNha) ? "" : $" - {t.TenToaNha}")</option>
+                        }
+                        else
+                        {
+                            <option value="@t.MaToaNha">@t.CodeToaNha@(string.IsNullOrEmpty(t.TenToaNha) ? "" : $" - {t.TenToaNha}")</option>
+                        }
+                    }
+                </select>
+                <select name="week" id="weekSelect" title="Cuộn danh sách để chọn tuần" onchange="document.getElementById('weekDate').value=''; this.form.submit()" class="h-[34px] w-full sm:w-auto bg-white border border-[#B9D9EB] rounded px-3 text-xs text-on-surface focus:outline-none focus:border-primary-container sm:min-w-[340px]">
+                    @foreach (var w in tuanOptions)
+                    {
+                        var nhan = $"Tuần {TuanSo(w)} [từ ngày {w:dd/MM/yyyy} đến ngày {w.AddDays(6):dd/MM/yyyy}]";
+                        if (w == weekStart)
+                        {
+                            <option value="@w.ToString("yyyy-MM-dd")" selected>@nhan</option>
+                        }
+                        else
+                        {
+                            <option value="@w.ToString("yyyy-MM-dd")">@nhan</option>
+                        }
+                    }
+                </select>
+                <label class="flex items-center gap-2 text-xs text-on-surface-variant">
+                    <span>Chọn ngày</span>
+                    <input type="date" name="ngay" id="weekDate" value="@weekStart.ToString("yyyy-MM-dd")"
+                           onchange="this.form.submit()"
+                           class="h-[34px] bg-white border border-[#B9D9EB] rounded px-3 text-xs text-on-surface focus:outline-none focus:border-primary-container" />
+                </label>
+            </div>
+            <!-- Hàng 2: nút thao tác + chú thích -->
+            <div class="flex flex-wrap items-center justify-between gap-3">
+                <div class="flex flex-wrap items-center gap-3">
+                    <button type="submit" class="h-[34px] px-4 bg-white hover:bg-[#E3EFF8] text-[#086A9F] border border-[#086A9F] rounded text-xs font-semibold flex items-center justify-center gap-1.5 transition">
+                        <span class="material-symbols-outlined text-sm">filter_alt</span> Lọc
+                    </button>
+                    <button type="button" onclick="window.print()" class="h-[34px] px-4 bg-white hover:bg-[#E3EFF8] text-[#086A9F] border border-[#086A9F] rounded text-xs font-semibold flex items-center justify-center gap-1.5 transition">
+                        <span class="material-symbols-outlined text-sm">print</span> In
+                    </button>
+                </div>
+                <div class="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-[11px] text-on-surface-variant">
+                    @if (canEdit)
+                    {
+                        <span class="flex items-center gap-1.5"><span class="w-3.5 h-3.5 rounded-sm bg-[#cce5ff]"></span> Lý thuyết</span>
+                        <span class="flex items-center gap-1.5"><span class="w-3.5 h-3.5 rounded-sm bg-[#f3e8ff]"></span> Thực hành &amp; GDTC</span>
+                        <span class="flex items-center gap-1.5"><span class="w-3.5 h-3.5 rounded-sm bg-error-container"></span> Báo nghỉ</span>
+                    }
+                    else
+                    {
+                        <span class="flex items-center gap-1.5"><span class="w-3.5 h-3.5 rounded-sm bg-[#cce5ff]"></span> Ca học (lý thuyết &amp; thực hành)</span>
+                    }
+                    <a href="@WeekUrl(weekStart)" class="flex items-center gap-1 font-semibold text-primary hover:underline">
+                        <span class="material-symbols-outlined text-[16px]">sync</span> Tải lại
+                    </a>
+                </div>
+            </div>
+            <!-- Hàng 3: thông tin tuần -->
+            <div class="flex flex-wrap items-center gap-1.5 text-xs text-on-surface-variant border-t border-[#D0E4F5] pt-2.5">
+                <span class="material-symbols-outlined text-[18px] text-primary">date_range</span>
+                <span>Tuần <b class="text-on-surface">@weekStart.ToString("dd/MM") – @weekEnd.ToString("dd/MM/yyyy")</b></span>
+                @if (soTrang > 1)
+                {
+                    <span class="text-on-surface-variant">— @tongSo ca, hiển thị @tuCa–@denCa (trang @(page)/@soTrang)</span>
+                }
+            </div>
+        </form>
+    </div>
+
+    <!-- Matrix -->
+    <div class="bg-white rounded border border-[#B9D9EB] shadow-sm overflow-hidden">
+        @if (soTrang > 1)
+        {
+            <div class="px-4 py-2 bg-surface-container-low border-b border-[#B9D9EB] text-[11px] text-on-surface-variant">
+                Tuần này có <b>@tongSo</b> ca — đang hiển thị ca <b>@tuCa–@denCa</b> (trang @(page)/@soTrang).
+                Lưới chỉ vẽ các ca thuộc trang hiện tại; thu hẹp bằng bộ lọc tòa nhà hoặc chuyển trang để xem phần còn lại.
+            </div>
+        }
+        <div class="overflow-x-auto">
+            <table class="w-full min-w-[1100px] border-collapse text-left text-xs border border-[#B9D9EB]">
+                <thead>
+                    <tr class="bg-white border-b border-[#B9D9EB] text-center text-xs font-semibold text-on-surface">
+                        <th class="w-[40px] py-2 border-r border-[#B9D9EB] text-[#086A9F]">
+                            <a href="@WeekUrl(prevWeek)" class="inline-block p-1 rounded hover:bg-surface-container-low" aria-label="Tuần trước">
+                                <span class="material-symbols-outlined text-base">arrow_left</span>
+                            </a>
+                        </th>
+                        @foreach (var day in days)
+                        {
+                            var isToday = day == today;
+                            <th class="py-2 px-2 border-r border-[#B9D9EB] w-[13%]">
+                                <span class="@(isToday ? "text-primary font-bold" : "")">@DayName(day.DayOfWeek)</span> <span class="font-normal text-outline">(@day.ToString("dd/MM"))</span>
+                            </th>
+                        }
+                        <th class="w-[40px] py-2 text-[#086A9F]">
+                            <a href="@WeekUrl(nextWeek)" class="inline-block p-1 rounded hover:bg-surface-container-low" aria-label="Tuần sau">
+                                <span class="material-symbols-outlined text-base">arrow_right</span>
+                            </a>
+                        </th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-[#B9D9EB]">
+                    @{
+                        var covered = days.ToDictionary(d => d, _ => 0);
+                        var timeCovered = 0;
+                    }
+                    @for (var t = 1; t <= 15; t++)
+                    {
+                        var gio = GioTiet(t);
+                        <tr class="h-[36px]">
+                            <td class="p-1 text-center border-r border-[#B9D9EB] bg-[#086A9F] text-white font-semibold">Tiết @t</td>
+                            @foreach (var day in days)
+                            {
+                                if (covered[day] >= t) { continue; }
+                                var slot = slotsByDay[day].FirstOrDefault(s => s.Start == t);
+                                if (slot.Items is not null)
+                                {
+                                    covered[day] = t + slot.Span - 1;
+                                    var tinted = slot.Items.Select(x => (X: x, Purple: canEdit && x.HocPhan?.LaThucHanh == true && x.TrangThaiHoatDong)).ToList();
+                                    var allPurple = tinted.All(i => i.Purple);
+                                    var cellBg = allPurple ? "bg-[#f3e8ff]" : "bg-[#cce5ff]";
+                                    <td rowspan="@slot.Span" class="p-1 border-r border-[#B9D9EB] align-top @cellBg text-on-surface">
+                                        <div class="flex flex-col gap-2 h-full">
+                                            @foreach (var i in tinted)
+                                            {
+                                                var x = i.X;
+                                                var practice = x.HocPhan?.LaThucHanh == true;
+                                                var cancelled = !x.TrangThaiHoatDong;
+                                                @if (canEdit)
+                                                {
+                                                    <button type="button"
+                                                            class="js-edit-lich p-1 text-[11px] leading-tight flex-1 w-full text-left rounded hover:bg-white/70 focus:outline-none focus:ring-2 focus:ring-primary"
+                                                            data-id="@x.MaLichHoc"
+                                                            data-ma-hoc-phan="@x.MaHocPhan"
+                                                            data-ten-hoc-phan="@x.HocPhan?.TenHocPhan"
+                                                            data-ngay="@x.NgayHoc.ToString("yyyy-MM-dd")"
+                                                            data-ca="@x.CaHoc"
+                                                            data-ma-phong="@(x.MaPhong?.ToString() ?? "")"
+                                                            data-trang-thai="@(x.TrangThaiHoatDong ? "true" : "false")"
+                                                            data-ma-gv="@x.MaGiangVienDayThay"
+                                                            data-ma-gv-goc="@x.HocPhan?.MaGiangVien"
+                                                            data-ghi-chu="@x.GhiChuDieuPhoi"
+                                                            title="Bấm để chỉnh sửa ca học">
+                                                        <div class="font-semibold @(cancelled ? "text-error line-through" : i.Purple ? "text-[#7e57c2]" : "text-primary")">@x.HocPhan?.TenHocPhan (@x.MaHocPhan)</div>
+                                                        @if (!cancelled)
+                                                        {
+                                                            <div class="text-on-surface-variant mt-0.5">Phòng: @x.PhongHoc?.CodePhong</div>
+                                                            <div class="text-on-surface-variant">GV: @(x.GiangVienDayThay?.HoTen ?? x.HocPhan?.GiangVien?.HoTen)</div>
+                                                        }
+                                                        else
+                                                        {
+                                                            <div class="text-error mt-0.5 font-semibold">Báo nghỉ</div>
+                                                        }
+                                                        <div class="flex items-center gap-1 text-outline mt-0.5">
+                                                            <span class="material-symbols-outlined text-xs">schedule</span> @GioCa(x.CaHoc)
+                                                        </div>
+                                                        <div class="flex flex-wrap items-center gap-1.5 mt-1">
+                                                            <span class="px-1 py-0.5 rounded bg-white/70 text-[9px] font-semibold text-on-surface-variant whitespace-nowrap">
+                                                                @(cancelled ? "Báo nghỉ" : practice ? "Thực hành" : "Chính khóa")
+                                                            </span>
+                                                            <span class="text-[9px] text-on-surface-variant">SV: @x.HocPhan?.SoLuongDangKy</span>
+                                                            <span class="text-[9px] text-primary font-semibold">Chỉnh sửa</span>
+                                                        </div>
+                                                    </button>
+                                                }
+                                                else
+                                                {
+                                                    <div class="p-1 text-[11px] leading-tight flex-1">
+                                                    <div class="font-semibold @(cancelled ? "text-error line-through" : i.Purple ? "text-[#7e57c2]" : "text-primary")">@x.HocPhan?.TenHocPhan (@x.MaHocPhan)</div>
+                                                    @if (!cancelled)
+                                                    {
+                                                        <div class="text-on-surface-variant mt-0.5">Phòng: @x.PhongHoc?.CodePhong</div>
+                                                        <div class="text-on-surface-variant">GV: @(x.GiangVienDayThay?.HoTen ?? x.HocPhan?.GiangVien?.HoTen)</div>
+                                                    }
+                                                    else
+                                                    {
+                                                        <div class="text-error mt-0.5 font-semibold">Báo nghỉ</div>
+                                                    }
+                                                    <div class="flex items-center gap-1 text-outline mt-0.5">
+                                                        <span class="material-symbols-outlined text-xs">schedule</span> @GioCa(x.CaHoc)
+                                                    </div>
+                                                    <div class="flex flex-wrap items-center gap-1.5 mt-1">
+                                                            <span class="px-1 py-0.5 rounded bg-white/70 text-[9px] font-semibold text-on-surface-variant whitespace-nowrap">
+                                                                @(cancelled ? "Báo nghỉ" : practice ? "Thực hành" : "Chính khóa")
+                                                            </span>
+                                                            <span class="text-[9px] text-on-surface-variant">SV: @x.HocPhan?.SoLuongDangKy</span>
+                                                        </div>
+                                                </div>
+                                                }
+                                            }
+                                        </div>
+                                    </td>
+                                }
+                                else
+                                {
+                                    <td class="p-1 border-r border-[#B9D9EB] bg-white align-top">
+                                        @if (canEdit)
+                                        {
+                                            var track = tracks.FirstOrDefault(c => c.Tiet == t);
+                                            if (track.Code is not null
+                                                && !Model.Any(x => x.NgayHoc == day && x.CaHoc == track.Code)
+                                                && !slotsByDay[day].Any(s => t < s.Start + s.Span && t + track.Span > s.Start))
+                                            {
+                                                <a href="/LichHoc/Create?ngay=@day.ToString("yyyy-MM-dd")&ca=@track.Code"
+                                                   class="flex items-center justify-center gap-1 h-full min-h-[28px] rounded border border-dashed border-outline-variant text-[10px] text-on-surface-variant hover:border-primary hover:text-primary hover:bg-white/60 transition-colors">
+                                                    <span class="material-symbols-outlined text-[14px]">add_circle</span>
+                                                    Xếp phòng nhanh
+                                                </a>
+                                            }
+                                        }
+                                    </td>
+                                }
+                            }
+                            @if (timeCovered < t)
+                            {
+                                var timeSlot = days.SelectMany(d => slotsByDay[d]).Where(s => s.Start <= t && t < s.Start + s.Span)
+                                    .OrderByDescending(s => s.Start).FirstOrDefault();
+                                if (timeSlot.Items is not null)
+                                {
+                                    timeCovered = timeSlot.Start + timeSlot.Span - 1;
+                                    <td rowspan="@(timeCovered - t + 1)" class="p-1 text-center align-middle bg-[#086A9F] text-white font-medium text-[11px]">@gio</td>
+                                }
+                                else
+                                {
+                                    <td class="p-1 text-center align-middle bg-[#086A9F] text-white font-medium text-[11px]">@gio</td>
+                                }
+                            }
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Summary -->
+        <div class="border-t border-surface-container bg-surface-container-low/60 px-4 py-2.5 grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3 text-[11px]">
+            <div class="flex items-center gap-2">
+                <span class="w-2 h-2 rounded-full bg-[#2b7fbd]"></span>
+                <div><span class="text-on-surface-variant">Tổng số ca học:</span> <span class="font-bold text-on-surface">@countAll ca</span><div class="text-[10px] text-on-surface-variant">Tuần @weekStart.ToString("dd/MM")–@weekEnd.ToString("dd/MM")</div></div>
+            </div>
+            @if (canEdit)
+            {
+                <div class="flex items-center gap-2">
+                    <span class="w-2 h-2 rounded-full bg-[#7e57c2]"></span>
+                    <div><span class="text-on-surface-variant">Thực hành &amp; GDTC:</span> <span class="font-bold text-on-surface">@countPractice ca</span><div class="text-[10px] text-on-surface-variant">Lý thuyết: @countTheory ca</div></div>
+                </div>
+            }
+            <div class="flex items-center gap-2">
+                <span class="w-2 h-2 rounded-full bg-secondary"></span>
+                <div><span class="text-on-surface-variant">Phòng học:</span> <span class="font-bold text-on-surface">@totalRooms phòng</span><div class="font-semibold text-error">Ca đã hủy: @countCancelled ca</div></div>
+            </div>
+        </div>
+
+        @if (soTrang > 1)
+        {
+            <div class="border-t border-surface-container px-4 py-2.5 flex items-center justify-center gap-1.5 text-xs">
+                @if (page > 1)
+                {
+                    <a href="@Trang(page - 1)" class="px-3 py-1.5 rounded-lg border border-outline-variant text-on-surface-variant hover:bg-surface-container-low">‹ Trước</a>
+                }
+                @for (var p = 1; p <= soTrang; p++)
+                {
+                    if (p == page)
+                    {
+                        <span class="px-3 py-1.5 rounded-lg bg-primary text-on-primary font-bold">@p</span>
+                    }
+                    else
+                    {
+                        <a href="@Trang(p)" class="px-3 py-1.5 rounded-lg border border-outline-variant text-on-surface-variant hover:bg-surface-container-low">@p</a>
+                    }
+                }
+                @if (page < soTrang)
+                {
+                    <a href="@Trang(page + 1)" class="px-3 py-1.5 rounded-lg border border-outline-variant text-on-surface-variant hover:bg-surface-container-low">Sau ›</a>
+                }
+            </div>
+        }
+    </div>
+</div>
+
+@if (canEdit)
+{
+    <dialog id="lichEditModal" class="rounded-xl shadow-2xl border border-outline-variant max-w-2xl w-[calc(100%-1.5rem)] p-0 backdrop:bg-black/40">
+      <form asp-action="Edit" method="post" id="editLichForm" class="bg-surface-container-lowest">
+        @Html.AntiForgeryToken()
+        <input type="hidden" name="MaLichHoc" id="editMaLichHoc" />
+        <input type="hidden" name="MaHocPhan" id="editMaHocPhan" />
+        <input type="hidden" name="week" value="@weekStart.ToString("yyyy-MM-dd")" />
+        <input type="hidden" name="building" value="@(building?.ToString() ?? "")" />
+        <input type="hidden" name="loai" value="@loai" />
+        <input type="hidden" name="Page" value="@(page)" />
+        <div class="px-5 py-4 border-b border-outline-variant flex items-start justify-between">
+          <div>
+            <h2 class="text-lg font-bold text-primary">Điều chỉnh ca học &amp; phân bổ thủ công</h2>
+            <p class="text-sm text-on-surface-variant">Cập nhật giảng viên thay thế, phòng, giờ và trạng thái ca</p>
+          </div>
+          <button type="button" onclick="document.getElementById('lichEditModal').close()" aria-label="Đóng">
+            <span class="material-symbols-outlined">close</span>
+          </button>
+        </div>
+        <div class="p-5 space-y-4">
+          <div class="rounded-lg border-l-4 border-primary bg-primary-container/30 p-3">
+            <div class="text-xs font-semibold text-primary">Điều phối ca học có sẵn</div>
+            <div id="editCourseTitle" class="mt-1 font-medium text-on-surface"></div>
+          </div>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <label class="block text-sm font-semibold">
+              Thứ trong tuần
+              <input type="date" name="NgayHoc" id="editNgayHoc" required class="mt-1 w-full rounded-lg border border-outline-variant bg-surface-container-low px-3 py-2" />
+            </label>
+            <label class="block text-sm font-semibold">
+              Khung ca học
+              <select name="CaHoc" id="editCaHoc" class="mt-1 w-full rounded-lg border border-outline-variant bg-surface-container-low px-3 py-2">
+                @foreach (var ca in Catalogs.CaHocSettings)
+                {
+                  <option value="@ca.Code">@ca.Label (@ca.TimeRange)</option>
+                }
+              </select>
+            </label>
+          </div>
+          <label class="block text-sm font-semibold">
+            Giảng viên phụ trách / thay thế
+            <select name="MaGiangVienDayThay" id="editMaGiangVienDayThay" class="mt-1 w-full rounded-lg border border-outline-variant bg-surface-container-low px-3 py-2">
+              <option value="">Giảng viên chính của học phần</option>
+              @foreach (var gv in giangVienOptions)
+              {
+                <option value="@gv.MaNguoiDung">@gv.HoTen (@gv.MaNguoiDung)</option>
+              }
+            </select>
+          </label>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <label class="block text-sm font-semibold">
+              Lọc loại phòng
+              <select id="editLoaiPhongLoc" class="mt-1 w-full rounded-lg border border-outline-variant bg-surface-container-low px-3 py-2">
+                <option value="">Tất cả loại phòng</option>
+                <option value="theory">Phòng lý thuyết</option>
+                <option value="practice">Phòng thực hành</option>
+                <option value="sports">Sân thể dục</option>
+              </select>
+            </label>
+            <label class="block text-sm font-semibold">
+              Đổi phòng học / sân bãi
+              <select name="MaPhong" id="editMaPhong" required class="mt-1 w-full rounded-lg border border-outline-variant bg-surface-container-low px-3 py-2">
+                <option value="">Chọn phòng học / sân bãi</option>
+                @foreach (var p in phongOptions.Where(x => NhomPhong(x) != "other"))
+                {
+                  <option value="@p.MaPhong" data-kind="@NhomPhong(p)">@p.CodePhong · @p.ToaNha?.CodeToaNha · @p.SucChua chỗ</option>
+                }
+              </select>
+            </label>
+          </div>
+          <label class="block text-sm font-semibold">
+            Trạng thái ca học
+            <select name="TrangThaiHoatDong" id="editTrangThaiHoatDong" class="mt-1 w-full rounded-lg border border-outline-variant bg-surface-container-low px-3 py-2">
+              <option value="true">Chính khóa (Bình thường)</option>
+              <option value="false">Báo nghỉ</option>
+            </select>
+          </label>
+          <label class="block text-sm font-semibold">
+            Ghi chú điều phối
+            <textarea name="GhiChuDieuPhoi" id="editGhiChuDieuPhoi" maxlength="500" rows="2" class="mt-1 w-full rounded-lg border border-outline-variant bg-surface-container-low px-3 py-2"></textarea>
+          </label>
+          <p id="editConflictBox" class="hidden rounded-lg bg-error-container p-3 text-sm text-on-error-container"></p>
+          <div class="flex flex-wrap items-center justify-between gap-2 pt-1">
+            <button type="submit" form="cancelLichForm"
+                    id="editCancelButton"
+                    class="px-4 py-2 rounded-lg bg-error-container text-on-error-container font-semibold"
+                    onclick="return confirm('Chuyển ca này sang trạng thái báo nghỉ?');">
+              <span class="material-symbols-outlined text-[18px] align-middle">delete</span> Hủy ca này
+            </button>
+            <div class="flex gap-2">
+              <button type="button" onclick="document.getElementById('lichEditModal').close()"
+                      class="px-4 py-2 rounded-lg bg-surface-container text-on-surface font-semibold">Hủy bỏ</button>
+              <button type="submit" class="px-4 py-2 rounded-lg bg-primary text-on-primary font-bold">
+                <span class="material-symbols-outlined text-[18px] align-middle">check</span> Lưu thay đổi
+              </button>
+            </div>
+          </div>
+        </div>
+      </form>
+    </dialog>
+    <form id="cancelLichForm" asp-action="Cancel" method="post" class="hidden">
+      @Html.AntiForgeryToken()
+      <input type="hidden" name="id" id="cancelLichId" />
+      <input type="hidden" name="week" value="@weekStart.ToString("yyyy-MM-dd")" />
+      <input type="hidden" name="building" value="@(building?.ToString() ?? "")" />
+      <input type="hidden" name="loai" value="@loai" />
+      <input type="hidden" name="Page" value="@(page)" />
+    </form>
+}
+
+<!-- Cấu hình giờ & Ca học: sửa khung giờ, thêm ca mới và lưu vào App_Data/cau-hinh-ca-hoc.json -->
+@if (canEdit)
+{
+    <dialog id="caModal" class="rounded-xl shadow-2xl border border-surface-container max-w-3xl w-full p-0 backdrop:bg-inverse-surface/50">
+        <form asp-action="CauHinhCaHoc" method="post" class="bg-surface-container-lowest">
+            @Html.AntiForgeryToken()
+            <input type="hidden" name="week" value="@weekStart.ToString("yyyy-MM-dd")" />
+            <input type="hidden" name="building" value="@(building?.ToString() ?? "")" />
+            <input type="hidden" name="loai" value="@loai" />
+            <div class="bg-primary-container px-4 py-3 flex items-center justify-between text-on-primary rounded-t-xl">
+                <div class="flex items-center gap-2">
+                    <span class="material-symbols-outlined text-[20px]">schedule</span>
+                    <h2 class="font-headline-sm text-headline-sm font-bold">Cấu hình giờ &amp; Ca học</h2>
+                </div>
+                <button type="button" onclick="document.getElementById('caModal').close()" class="text-on-primary-container hover:text-on-primary transition-colors">
+                    <span class="material-symbols-outlined">close</span>
+                </button>
+            </div>
+            <div class="p-4">
+                <p class="mb-3 text-xs text-on-surface-variant">
+                    Ca <b>lý thuyết</b> dùng khung 3 tiết; ca <b>thực hành / thí nghiệm</b> dùng khung 5 tiết bao trọn 2 ca lý thuyết.
+                    Sửa khung giờ rồi bấm <b>Lưu cấu hình</b> để hệ thống áp dụng cho cả lưới thời khóa biểu, xếp lịch tự động và mượn phòng.
+                </p>
+                <div class="overflow-x-auto rounded-lg border border-surface-container">
+                    <table class="w-full text-xs">
+                        <thead>
+                            <tr class="bg-surface-container-low text-on-surface-variant text-left">
+                                <th class="p-2 border-b border-surface-container font-semibold">Mã ca</th>
+                                <th class="p-2 border-b border-surface-container font-semibold">Tên ca</th>
+                                <th class="p-2 border-b border-surface-container font-semibold">Bắt đầu</th>
+                                <th class="p-2 border-b border-surface-container font-semibold">Kết thúc</th>
+                                <th class="p-2 border-b border-surface-container font-semibold">Tiết</th>
+                                <th class="p-2 border-b border-surface-container font-semibold">Số tiết</th>
+                                <th class="p-2 border-b border-surface-container"></th>
+                            </tr>
+                        </thead>
+                        <tbody id="caBody">
+                            @{ var idx = 0; }
+                            @foreach (var c in Catalogs.CaHocSettings)
+                            {
+                                <tr class="border-b border-surface-container last:border-0">
+                                    <td class="p-1"><input name="caHocs[@idx].Code" value="@c.Code" class="w-28 rounded bg-surface-container-low px-2 py-1 font-mono" /></td>
+                                    <td class="p-1"><input name="caHocs[@idx].Label" value="@c.Label" class="w-36 rounded bg-surface-container-low px-2 py-1" /></td>
+                                    <td class="p-1"><input name="caHocs[@idx].BatDau" value="@c.BatDau" placeholder="HH:mm" inputmode="numeric" maxlength="5" pattern="[0-2][0-9]:[0-5][0-9]" title="Giờ 24h, ví dụ 13:00" class="gio w-24 rounded bg-surface-container-low px-2 py-1 font-mono" /></td>
+                                    <td class="p-1"><input name="caHocs[@idx].KetThuc" value="@c.KetThuc" placeholder="HH:mm" inputmode="numeric" maxlength="5" pattern="[0-2][0-9]:[0-5][0-9]" title="Giờ 24h, ví dụ 17:25" class="gio w-24 rounded bg-surface-container-low px-2 py-1 font-mono" /></td>
+                                    <td class="p-1"><input name="caHocs[@idx].Tiet" type="number" min="1" max="15" value="@c.Tiet" class="w-14 rounded bg-surface-container-low px-2 py-1" /></td>
+                                    <td class="p-1"><input name="caHocs[@idx].SoTiet" type="number" min="3" max="5" step="2" value="@c.SoTiet" class="w-14 rounded bg-surface-container-low px-2 py-1" /></td>
+                                    <td class="p-1 text-center">
+                                        <button type="button" onclick="xoaCa(this)" class="text-error" title="Xóa ca">
+                                            <span class="material-symbols-outlined text-[18px]">delete</span>
+                                        </button>
+                                    </td>
+                                </tr>
+                                idx++;
+                            }
+                        </tbody>
+                    </table>
+                </div>
+                <div class="mt-3 flex flex-wrap items-center justify-between gap-2">
+                    <button type="button" onclick="themCa()"
+                            class="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-outline-variant text-xs font-semibold text-primary hover:bg-surface-container-low transition-colors">
+                        <span class="material-symbols-outlined text-[18px]">add</span> Thêm ca học
+                    </button>
+                    <div class="flex items-center gap-2">
+                        <button type="button" onclick="document.getElementById('caModal').close()"
+                                class="px-4 py-2 rounded-lg border border-outline-variant text-xs font-semibold text-on-surface-variant">
+                            Hủy
+                        </button>
+                        <button type="submit" class="px-4 py-2 rounded-lg bg-primary text-on-primary text-xs font-bold">
+                            Lưu cấu hình
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </form>
+    </dialog>
+}
+
+@section Scripts {
+<script>
+    const editModal = document.getElementById('lichEditModal');
+    const editForm = document.getElementById('editLichForm');
+    const roomFilter = document.getElementById('editLoaiPhongLoc');
+    const roomSelect = document.getElementById('editMaPhong');
+    const conflictBox = document.getElementById('editConflictBox');
+    let conflictCheckId = 0;
+    let editSubmitting = false;
+
+    function filterEditRooms(preferredRoom) {
+        const kind = roomFilter.value;
+        const options = Array.from(roomSelect.options).slice(1);
+        options.forEach(option => {
+            option.hidden = !!kind && option.dataset.kind !== kind;
+        });
+        const requestedRoom = preferredRoom === undefined ? roomSelect.value : preferredRoom;
+        const selected = options.find(option => option.value === requestedRoom && !option.hidden);
+        if (selected) {
+            roomSelect.value = selected.value;
+        } else if (preferredRoom !== undefined) {
+            roomSelect.value = '';
+        } else {
+            roomSelect.value = options.find(option => !option.hidden)?.value || '';
+        }
+    }
+
+    async function checkEditConflict() {
+        const requestId = ++conflictCheckId;
+        const active = document.getElementById('editTrangThaiHoatDong').value === 'true';
+        const roomId = roomSelect.value;
+        if (!active || !roomId) {
+            conflictBox.classList.add('hidden');
+            conflictBox.textContent = '';
+            return false;
+        }
+
+        const params = new URLSearchParams({
+            maPhong: roomId,
+            ngay: document.getElementById('editNgayHoc').value,
+            ca: document.getElementById('editCaHoc').value,
+            maHocPhan: document.getElementById('editMaHocPhan').value,
+            maGiangVienDayThay: document.getElementById('editMaGiangVienDayThay').value,
+            excludeLichHocId: document.getElementById('editMaLichHoc').value
+        });
+        try {
+            const response = await fetch(`/LichHoc/CheckConflict?${params}`);
+            if (!response.ok) throw new Error('Không kiểm tra được xung đột lịch.');
+            const data = await response.json();
+            if (requestId !== conflictCheckId) return false;
+            conflictBox.textContent = data.conflict ? data.messages.join(' ') : '';
+            conflictBox.classList.toggle('hidden', !data.conflict);
+            return data.conflict;
+        } catch (error) {
+            if (requestId === conflictCheckId) {
+                conflictBox.textContent = 'Chưa kiểm tra được xung đột. Hệ thống sẽ xác minh lại khi lưu.';
+                conflictBox.classList.remove('hidden');
+            }
+            return false;
+        }
+    }
+
+    document.querySelectorAll('.js-edit-lich').forEach(button => {
+        button.addEventListener('click', async () => {
+            document.getElementById('editMaLichHoc').value = button.dataset.id;
+            document.getElementById('editMaHocPhan').value = button.dataset.maHocPhan;
+            document.getElementById('editCourseTitle').textContent =
+                `${button.dataset.tenHocPhan} (${button.dataset.maHocPhan}) · ${button.dataset.ngay} · ${button.dataset.ca}`;
+            document.getElementById('editNgayHoc').value = button.dataset.ngay;
+            document.getElementById('editCaHoc').value = button.dataset.ca;
+            document.getElementById('editMaGiangVienDayThay').value = button.dataset.maGv || '';
+            document.getElementById('editTrangThaiHoatDong').value = button.dataset.trangThai;
+            document.getElementById('editGhiChuDieuPhoi').value = button.dataset.ghiChu || '';
+            document.getElementById('editCancelButton').hidden = button.dataset.trangThai !== 'true';
+            roomFilter.value = '';
+            filterEditRooms(button.dataset.maPhong || '');
+            roomSelect.required = button.dataset.trangThai === 'true';
+            document.getElementById('cancelLichId').value = button.dataset.id;
+            conflictBox.classList.add('hidden');
+            editModal.showModal();
+            await checkEditConflict();
+        });
+    });
+
+    roomFilter.addEventListener('change', () => {
+        filterEditRooms();
+        checkEditConflict();
+    });
+    ['editMaPhong', 'editNgayHoc', 'editCaHoc', 'editMaGiangVienDayThay', 'editTrangThaiHoatDong']
+        .forEach(id => document.getElementById(id).addEventListener('change', event => {
+            if (id === 'editTrangThaiHoatDong') {
+                roomSelect.required = event.target.value === 'true';
+                document.getElementById('editCancelButton').hidden = event.target.value !== 'true';
+            }
+            checkEditConflict();
+        }));
+    editForm.addEventListener('submit', async event => {
+        if (editSubmitting) return;
+        event.preventDefault();
+        const hasConflict = await checkEditConflict();
+        if (!hasConflict) {
+            editSubmitting = true;
+            editForm.requestSubmit(event.submitter);
+        }
+    });
+
+    function renumberCa() {
+        document.querySelectorAll('#caBody tr').forEach((tr, i) => {
+            tr.querySelectorAll('input').forEach(inp => {
+                inp.name = inp.name.replace(/caHocs\[\d+\]/, 'caHocs[' + i + ']');
+            });
+        });
+    }
+    function themCa() {
+        const i = document.querySelectorAll('#caBody tr').length;
+        const tr = document.createElement('tr');
+        tr.className = 'border-b border-surface-container last:border-0';
+        tr.innerHTML =
+            `<td class="p-1"><input name="caHocs[${i}].Code" placeholder="CA_..." class="w-28 rounded bg-surface-container-low px-2 py-1 font-mono" /></td>` +
+            `<td class="p-1"><input name="caHocs[${i}].Label" placeholder="Tên ca" class="w-36 rounded bg-surface-container-low px-2 py-1" /></td>` +
+            `<td class="p-1"><input name="caHocs[${i}].BatDau" placeholder="HH:mm" inputmode="numeric" maxlength="5" pattern="[0-2][0-9]:[0-5][0-9]" class="gio w-24 rounded bg-surface-container-low px-2 py-1 font-mono" /></td>` +
+            `<td class="p-1"><input name="caHocs[${i}].KetThuc" placeholder="HH:mm" inputmode="numeric" maxlength="5" pattern="[0-2][0-9]:[0-5][0-9]" class="gio w-24 rounded bg-surface-container-low px-2 py-1 font-mono" /></td>` +
+            `<td class="p-1"><input name="caHocs[${i}].Tiet" type="number" min="1" max="15" value="1" class="w-14 rounded bg-surface-container-low px-2 py-1" /></td>` +
+            `<td class="p-1"><input name="caHocs[${i}].SoTiet" type="number" min="3" max="5" step="2" value="3" class="w-14 rounded bg-surface-container-low px-2 py-1" /></td>` +
+            `<td class="p-1 text-center"><button type="button" onclick="xoaCa(this)" class="text-error" title="Xóa ca"><span class="material-symbols-outlined text-[18px]">delete</span></button></td>`;
+        document.getElementById('caBody').appendChild(tr);
+    }
+    function xoaCa(btn) {
+        if (document.querySelectorAll('#caBody tr').length <= 1) return;
+        btn.closest('tr').remove();
+        renumberCa();
+    }
+
+    // Chuẩn hóa giờ về dạng 24h hai chữ số: 7:00 / 7h / 700 -> 07:00.
+    function chuanHoaGio(el) {
+        var raw = el.value.trim().toLowerCase()
+            .replace(/[hg.]/g, ':').replace(/[^0-9:]/g, '');
+        var m = raw.match(/^(\d{1,2}):?(\d{1,2})?$/);
+        if (!m) return;
+        var h = Math.min(23, parseInt(m[1] || '0', 10));
+        var mi = Math.min(59, parseInt(m[2] || '0', 10));
+        el.value = String(h).padStart(2, '0') + ':' + String(mi).padStart(2, '0');
+    }
+    document.getElementById('caBody').addEventListener('focusout', function (e) {
+        if (e.target.classList && e.target.classList.contains('gio')) chuanHoaGio(e.target);
+    });
+</script>
+}

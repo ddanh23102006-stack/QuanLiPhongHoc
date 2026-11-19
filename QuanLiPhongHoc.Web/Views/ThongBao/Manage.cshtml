@@ -1,0 +1,79 @@
+@model IReadOnlyList<ThongBao>
+@{
+    ViewData["Title"] = "Quản trị thông báo";
+    var nguoiQuanTri = ViewBag.NguoiQuanTri as Dictionary<string, string> ?? [];
+    var duocDangBai = User.IsInRole(AppRoles.Training);
+}
+
+<div class="flex flex-wrap items-center justify-between gap-space-md mb-space-md">
+  <div>
+    <div class="text-xs text-on-surface-variant">Đào tạo / <span class="font-bold">Thông báo</span></div>
+    <h1 class="text-xl font-bold">Quản lý thông báo trang chủ</h1>
+    @if (!duocDangBai)
+    {
+      <p class="text-xs text-on-surface-variant mt-1">Chế độ theo dõi: nhân viên đào tạo là bộ phận đăng và chỉnh sửa bản tin.</p>
+    }
+  </div>
+  @if (duocDangBai)
+  {
+    <a class="px-3 py-2 rounded-lg bg-primary-container text-on-primary font-semibold text-sm" href="/ThongBao/Create">+ Đăng thông báo</a>
+  }
+</div>
+
+<div class="bg-surface-container-lowest rounded-xl shadow-sm overflow-x-auto">
+  <table class="w-full text-sm text-left">
+    <thead>
+      <tr class="bg-surface-container-low/50 text-on-surface-variant">
+        <th class="px-4 py-3 font-semibold">Tiêu đề</th>
+        <th class="px-4 py-3 font-semibold">Đối tượng</th>
+        <th class="px-4 py-3 font-semibold">Trạng thái</th>
+        <th class="px-4 py-3 font-semibold">Ngày đăng</th>
+        <th class="px-4 py-3 font-semibold">Người quản trị</th>
+        <th class="px-4 py-3 font-semibold text-right">Thao tác</th>
+      </tr>
+    </thead>
+    <tbody class="divide-y divide-outline-variant/40">
+      @if (Model.Count == 0)
+      {
+        <tr><td colspan="6" class="px-4 py-8 text-center italic text-on-surface-variant">Chưa có thông báo nào.</td></tr>
+      }
+      @foreach (var tin in Model)
+      {
+        <tr class="hover:bg-surface-container-low/30">
+          <td class="px-4 py-3">
+            <a class="font-medium text-primary hover:underline" href="/ThongBao/Details/@tin.MaThongBao">@tin.TieuDe</a>
+            <div class="flex gap-1.5 mt-1">
+              @if (tin.LaMoi) { <span class="px-1.5 py-0.5 rounded bg-[#8e24aa] text-white text-[10px] font-bold uppercase">Mới</span> }
+              @if (tin.NoiBat) { <span class="px-1.5 py-0.5 rounded bg-secondary-container text-on-secondary-container text-[10px] font-bold uppercase">Nổi bật</span> }
+            </div>
+          </td>
+          <td class="px-4 py-3 text-on-surface-variant">@ThongBaoDoiTuong.Label(tin.DoiTuong)</td>
+          <td class="px-4 py-3">
+            <span class="px-2 py-0.5 rounded text-[11px] font-bold uppercase @(tin.TrangThai == "PUBLISHED" ? "bg-tertiary-container/15 text-tertiary" : "bg-surface-container text-on-surface-variant")">
+              @(tin.TrangThai == "PUBLISHED" ? "Đã đăng" : "Bản nháp")
+            </span>
+          </td>
+          <td class="px-4 py-3 font-mono text-xs">@tin.NgayDang.ToString("dd/MM/yyyy")</td>
+          <td class="px-4 py-3 text-xs text-on-surface-variant">
+            @(tin.NguoiDang is null ? "—" : nguoiQuanTri.TryGetValue(tin.NguoiDang, out var ten) ? ten : tin.NguoiDang)
+          </td>
+          <td class="px-4 py-3 text-right whitespace-nowrap">
+            @if (duocDangBai)
+            {
+              <a class="text-primary hover:underline text-xs font-semibold" href="/ThongBao/Edit/@tin.MaThongBao">Sửa</a>
+              <form asp-action="Delete" asp-route-id="@tin.MaThongBao" method="post" class="inline ml-2"
+                    onsubmit="return confirm('Xóa thông báo này?');">
+                @Html.AntiForgeryToken()
+                <button type="submit" class="text-error hover:underline text-xs font-semibold">Xóa</button>
+              </form>
+            }
+            else
+            {
+              <a class="text-primary hover:underline text-xs font-semibold" href="/ThongBao/Details/@tin.MaThongBao">Xem</a>
+            }
+          </td>
+        </tr>
+      }
+    </tbody>
+  </table>
+</div>

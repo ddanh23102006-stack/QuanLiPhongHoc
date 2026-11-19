@@ -1,0 +1,72 @@
+@model ThongBaoDetailVm
+@{
+    ViewData["Title"] = Model.ThongBao.TieuDe;
+    var tin = Model.ThongBao;
+}
+
+<nav class="flex items-center gap-2 mb-4 text-on-surface-variant font-label-md text-label-md">
+    <a class="hover:text-primary transition-colors flex items-center gap-1" href="/">
+        <span class="material-symbols-outlined text-[16px]">home</span>
+        Trang chủ
+    </a>
+    <span class="material-symbols-outlined text-[14px] text-outline">chevron_right</span>
+    <a class="hover:text-primary transition-colors" href="/ThongBao">Thông báo</a>
+    <span class="material-symbols-outlined text-[14px] text-outline">chevron_right</span>
+    <span class="text-primary font-semibold">Chi tiết</span>
+</nav>
+
+<article class="bg-surface-container-lowest border border-outline-variant/80 rounded-xl shadow-sm overflow-hidden mb-6">
+    <div class="px-6 sm:px-10 py-6 border-b border-[#dbe8f2] flex flex-col sm:flex-row sm:items-start justify-between gap-3">
+        <h1 class="font-headline-lg text-headline-lg text-on-surface font-bold uppercase leading-snug flex-1">
+            @tin.TieuDe
+        </h1>
+        <span class="text-sm text-on-surface-variant shrink-0 pt-1">@tin.NgayDang.ToString("dd/MM/yyyy")</span>
+    </div>
+
+    <div class="px-6 sm:px-10 py-7">
+        @if (tin.LaMoi)
+        {
+            <span class="inline-block bg-[#8e24aa] text-white text-[10px] font-bold px-1.5 py-0.5 rounded mr-2 uppercase align-middle">Mới</span>
+        }
+        <span class="text-[13px] text-on-surface-variant align-middle">
+            @ThongBaoDoiTuong.Label(tin.DoiTuong)
+            @if (!string.IsNullOrEmpty(Model.NguoiQuanTri))
+            {
+                <text> • Người quản trị: @Model.NguoiQuanTri</text>
+            }
+        </span>
+
+        @if (!string.IsNullOrEmpty(tin.AnhDaiDien))
+        {
+            <img src="@tin.AnhDaiDien" alt="" class="w-full max-h-[380px] object-cover rounded-xl mt-5 mb-2" />
+        }
+
+        @* NoiDung là văn bản thuần: Razor tự escape, giữ ngắt dòng bằng pre-line. *@
+        <div class="mt-6 text-[15px] leading-[1.75] text-on-surface whitespace-pre-line">
+            @tin.NoiDung
+        </div>
+    </div>
+</article>
+
+@if (Model.BaiVietLienQuan.Count > 0)
+{
+    <section class="bg-surface-container-lowest border border-outline-variant/80 rounded-xl shadow-sm overflow-hidden">
+        <div class="px-5 pt-4 pb-3 flex items-center gap-3">
+            <h2 class="text-[15px] font-bold text-[#086a9f] uppercase tracking-wide">Bài viết liên quan</h2>
+            <span class="h-[2px] flex-1 bg-[#dbe8f2]"></span>
+        </div>
+        <div class="h-[1px] bg-[#dbe8f2] w-full"></div>
+        <div class="px-3 py-2 divide-y divide-slate-100">
+            @foreach (var khac in Model.BaiVietLienQuan)
+            {
+                <a class="py-2.5 flex items-baseline justify-between gap-4 group hover:bg-slate-50/70 px-2 rounded transition-colors" href="/ThongBao/Details/@khac.MaThongBao">
+                    <span class="flex items-start gap-1.5 flex-1">
+                        <span class="text-[#086a9f] font-bold text-sm select-none leading-tight mt-0.5">»</span>
+                        <span class="text-[13px] text-slate-800 group-hover:text-[#086a9f] transition-colors leading-snug">@khac.TieuDe</span>
+                    </span>
+                    <span class="text-[12px] text-slate-500 whitespace-nowrap shrink-0">@khac.NgayDang.ToString("dd/MM/yyyy")</span>
+                </a>
+            }
+        </div>
+    </section>
+}

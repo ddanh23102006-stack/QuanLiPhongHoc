@@ -1,0 +1,31 @@
+@model IEnumerable<NhatKyHeThong>
+@{
+  ViewData["Title"] = "Nhật ký";
+  var tenVaiTro = ViewBag.TenVaiTro as IReadOnlyDictionary<int, string>;
+}
+<h1 class="text-xl font-bold mb-space-md">Giám sát nhật ký hệ thống</h1>
+<form class="mb-space-md"><input name="q" value="@Context.Request.Query["q"]" placeholder="Lọc hành động / đối tượng" class="rounded-lg bg-surface-container-lowest px-3 py-2 shadow-sm w-80" /></form>
+<div class="bg-surface-container-lowest rounded-xl shadow-sm overflow-x-auto">
+<table class="w-full text-sm">
+  <thead class="bg-surface-container text-left"><tr>
+    <th class="p-3">Thời gian</th><th>Người thực hiện</th><th>Hành động</th><th>Đối tượng</th><th>Giá trị cũ</th><th>Giá trị mới</th><th>Địa chỉ IP</th>
+  </tr></thead>
+  <tbody>
+  @foreach (var n in Model) {
+    <tr class="border-t border-surface-container">
+      <td class="p-3 whitespace-nowrap">@n.ThoiGian.ToString("dd/MM HH:mm:ss")</td>
+      <td>@(n.NguoiThucHien?.HoTen ?? n.MaNguoiThucHien)</td>
+      <td>@NhatKyCatalog.LabelHanhDong(n.LoaiHanhDong)</td>
+      <td>@NhatKyCatalog.LabelDoiTuong(n.DoiTuongTacDong)</td>
+      <td class="max-w-[200px] truncate" title="@NhatKyCatalog.ChiTiet(n.DuLieuCu, tenVaiTro)">@NhatKyCatalog.ChiTiet(n.DuLieuCu, tenVaiTro)</td>
+      <td class="max-w-[200px] truncate" title="@NhatKyCatalog.ChiTiet(n.DuLieuMoi, tenVaiTro)">@NhatKyCatalog.ChiTiet(n.DuLieuMoi, tenVaiTro)</td>
+      <td>@(string.IsNullOrWhiteSpace(n.DiaChiIp) ? "—" : n.DiaChiIp)</td>
+    </tr>
+  }
+  @if (!Model.Any())
+  {
+    <tr><td colspan="7" class="p-6 text-center italic text-on-surface-variant">Không có nhật ký nào phù hợp bộ lọc.</td></tr>
+  }
+  </tbody>
+</table>
+</div>

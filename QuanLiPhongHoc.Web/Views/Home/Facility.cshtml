@@ -1,0 +1,209 @@
+@using QuanLiPhongHoc.Web.Services
+@using QuanLiPhongHoc.Web.Models.ViewModels
+@{
+    ViewData["Title"] = "Bảng tin Cơ sở vật chất";
+    var kpi = ViewBag.Kpi as DashboardKpiDto;
+    var thongBao = ViewBag.ThongBao as ThongBaoHomeVm;
+    var suCoMoi = kpi?.SuCoMoi ?? 0;
+    var donCho = (kpi?.DonDatCho ?? 0) + (kpi?.DonNghiCho ?? 0);
+    var today = DateTime.Today;
+    var dayOfWeek = today.DayOfWeek switch
+    {
+        DayOfWeek.Monday => "Thứ Hai",
+        DayOfWeek.Tuesday => "Thứ Ba",
+        DayOfWeek.Wednesday => "Thứ Tư",
+        DayOfWeek.Thursday => "Thứ Năm",
+        DayOfWeek.Friday => "Thứ Sáu",
+        DayOfWeek.Saturday => "Thứ Bảy",
+        DayOfWeek.Sunday => "Chủ Nhật",
+        _ => ""
+    };
+}
+
+<!-- Welcome / breadcrumb strip -->
+<section class="bg-surface-container-lowest px-5 py-3 rounded-xl shadow-sm border border-surface-container flex flex-col md:flex-row md:items-center justify-between gap-3 mb-4">
+    <div class="flex flex-col gap-0.5">
+        <div class="flex items-center gap-1.5 text-body-sm text-on-surface-variant">
+            <a href="/Home" class="hover:text-primary">Trang chủ</a>
+            <span class="text-outline-variant">&gt;</span>
+            <span class="text-primary font-semibold">Bảng tin &amp; Điều phối Cơ sở vật chất</span>
+        </div>
+        <div class="flex flex-wrap items-center gap-2 mt-0.5">
+            <span class="w-2 h-2 rounded-full bg-tertiary"></span>
+            <span class="font-headline-sm text-headline-sm text-on-surface">Xin chào, @((string?)ViewBag.HoTen ?? User.Identity?.Name)!</span>
+            <span class="text-outline-variant">•</span>
+            <span class="font-label-md text-label-md text-secondary">Trung tâm Quản lý Cơ sở vật chất - TDMU</span>
+        </div>
+    </div>
+    <div class="flex items-center gap-2 shrink-0">
+        <div class="px-3 py-1.5 rounded-lg bg-surface-container-low text-primary font-label-md text-label-md flex items-center gap-1.5 border border-surface-container">
+            <span class="material-symbols-outlined text-[18px]">event_available</span>
+            <span>@dayOfWeek, @today.ToString("dd/MM/yyyy") • Học kỳ 1</span>
+        </div>
+    </div>
+</section>
+
+<!-- Announcements -->
+<partial name="_ThongBaoBlock" model="thongBao" />
+
+<!-- KPI live panel -->
+<section class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4" id="kpi-grid">
+    <partial name="_KpiCards" model="kpi" />
+</section>
+
+<!-- Main functions -->
+<section class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-2">
+    <div class="bg-surface-container-lowest p-4 rounded-xl shadow-sm border border-surface-container hover:shadow-md transition-all flex flex-col justify-between gap-3">
+        <div class="flex flex-col gap-2">
+            <div class="flex items-center justify-between">
+                <div class="w-12 h-12 rounded-xl bg-surface-container text-primary flex items-center justify-center">
+                    <span class="material-symbols-outlined text-[28px]">meeting_room</span>
+                </div>
+                <span class="px-2 py-0.5 rounded-full bg-surface-container text-primary font-label-sm text-label-sm font-semibold">
+                    @(kpi?.PhongSanSang ?? 0)/@(kpi?.TongPhong ?? 0) phòng
+                </span>
+            </div>
+            <h4 class="font-headline-sm text-headline-sm text-on-surface font-bold">Quản lý phòng học</h4>
+            <p class="font-body-sm text-body-sm text-on-surface-variant">
+                Danh mục @(kpi?.TongPhong ?? 0) phòng học toàn trường: sức chứa, loại phòng, trạng thái sử dụng và thiết bị gắn kèm theo từng phòng.
+            </p>
+        </div>
+        <div class="pt-2 border-t border-surface-container flex items-center justify-between">
+            <a href="/PhongHoc" class="font-label-md text-label-md text-primary hover:underline flex items-center gap-1 font-semibold">
+                <span>Xem danh sách phòng</span>
+                <span class="material-symbols-outlined text-[16px]">arrow_forward</span>
+            </a>
+            <span class="font-label-sm text-label-sm text-on-surface-variant">Danh mục</span>
+        </div>
+    </div>
+
+    <div class="bg-surface-container-lowest p-4 rounded-xl shadow-sm border border-surface-container hover:shadow-md transition-all flex flex-col justify-between gap-3">
+        <div class="flex flex-col gap-2">
+            <div class="flex items-center justify-between">
+                <div class="w-12 h-12 rounded-xl bg-[#c7e7fa] text-primary flex items-center justify-center">
+                    <span class="material-symbols-outlined text-[28px]">apartment</span>
+                </div>
+                <span class="px-2 py-0.5 rounded-full bg-surface-container text-secondary font-label-sm text-label-sm font-semibold">Theo tòa nhà</span>
+            </div>
+            <h4 class="font-headline-sm text-headline-sm text-on-surface font-bold">Quản lý tòa nhà</h4>
+            <p class="font-body-sm text-body-sm text-on-surface-variant">
+                Rà soát khối nhà, tầng và phòng trực thuộc; phân công nhân viên quản lý tòa nhà và theo dõi tình trạng khai thác từng công trình.
+            </p>
+        </div>
+        <div class="pt-2 border-t border-surface-container flex items-center justify-between">
+            <a href="/ToaNha" class="font-label-md text-label-md text-primary hover:underline flex items-center gap-1 font-semibold">
+                <span>Khai thác tòa nhà</span>
+                <span class="material-symbols-outlined text-[16px]">arrow_forward</span>
+            </a>
+            <span class="font-label-sm text-label-sm text-on-surface-variant">Công trình</span>
+        </div>
+    </div>
+
+    <div class="bg-surface-container-lowest p-4 rounded-xl shadow-sm border border-surface-container hover:shadow-md transition-all flex flex-col justify-between gap-3">
+        <div class="flex flex-col gap-2">
+            <div class="flex items-center justify-between">
+                <div class="w-12 h-12 rounded-xl bg-secondary-fixed text-on-secondary-fixed flex items-center justify-center">
+                    <span class="material-symbols-outlined text-[28px]">devices</span>
+                </div>
+                <span class="px-2 py-0.5 rounded-full bg-surface-container text-secondary font-label-sm text-label-sm font-semibold">Danh mục CSVC</span>
+            </div>
+            <h4 class="font-headline-sm text-headline-sm text-on-surface font-bold">Thiết bị &amp; tài sản phòng</h4>
+            <p class="font-body-sm text-body-sm text-on-surface-variant">
+                Cấu hình thiết bị chuẩn theo loại phòng, gắn thiết bị vào từng phòng và cập nhật trạng thái hỏng, bảo trì, đã thay thế của từng tài sản.
+            </p>
+        </div>
+        <div class="pt-2 border-t border-surface-container flex items-center justify-between">
+            <a href="/ThietBi" class="font-label-md text-label-md text-primary hover:underline flex items-center gap-1 font-semibold">
+                <span>Cập nhật thiết bị</span>
+                <span class="material-symbols-outlined text-[16px]">arrow_forward</span>
+            </a>
+            <span class="font-label-sm text-label-sm text-on-surface-variant">Tài sản</span>
+        </div>
+    </div>
+
+    <div class="bg-surface-container-lowest p-4 rounded-xl shadow-sm border border-surface-container hover:shadow-md transition-all flex flex-col justify-between gap-3">
+        <div class="flex flex-col gap-2">
+            <div class="flex items-center justify-between">
+                <div class="w-12 h-12 rounded-xl bg-error-container text-on-error-container flex items-center justify-center">
+                    <span class="material-symbols-outlined text-[28px]">assignment_turned_in</span>
+                </div>
+                @if (donCho > 0)
+                {
+                    <span class="px-2.5 py-0.5 rounded-full bg-error-container text-on-error-container font-label-sm text-label-sm font-bold">@donCho đơn chờ</span>
+                }
+                else
+                {
+                    <span class="px-2.5 py-0.5 rounded-full bg-surface-container text-secondary font-label-sm text-label-sm font-semibold">Đã xử lý hết</span>
+                }
+            </div>
+            <h4 class="font-headline-sm text-headline-sm text-on-surface font-bold">Duyệt đơn mượn phòng</h4>
+            <p class="font-body-sm text-body-sm text-on-surface-variant">
+                Xem xét đề xuất mượn phòng ngoài giờ học của các đơn vị, kiểm tra trùng lịch và phê duyệt hoặc từ chối kèm lý do trên hệ thống.
+            </p>
+        </div>
+        <div class="pt-2 border-t border-surface-container flex items-center justify-between">
+            <a href="/DatPhong" class="font-label-md text-label-md text-error hover:underline flex items-center gap-1 font-semibold">
+                <span>Đi đến danh sách chờ</span>
+                <span class="material-symbols-outlined text-[16px]">arrow_forward</span>
+            </a>
+            <span class="px-2 py-0.5 rounded bg-error/10 text-error font-label-sm text-label-sm font-semibold">Ưu tiên xử lý</span>
+        </div>
+    </div>
+
+    <div class="bg-surface-container-lowest p-4 rounded-xl shadow-sm border border-surface-container hover:shadow-md transition-all flex flex-col justify-between gap-3">
+        <div class="flex flex-col gap-2">
+            <div class="flex items-center justify-between">
+                <div class="w-12 h-12 rounded-xl bg-error-container text-on-error-container flex items-center justify-center">
+                    <span class="material-symbols-outlined text-[28px]">report</span>
+                </div>
+                @if (suCoMoi > 0)
+                {
+                    <span class="px-2.5 py-0.5 rounded-full bg-error-container text-on-error-container font-label-sm text-label-sm font-bold">@suCoMoi sự cố mới</span>
+                }
+                else
+                {
+                    <span class="px-2.5 py-0.5 rounded-full bg-surface-container text-secondary font-label-sm text-label-sm font-semibold">Không có sự cố mở</span>
+                }
+            </div>
+            <h4 class="font-headline-sm text-headline-sm text-on-surface font-bold">Tiếp nhận &amp; xử lý sự cố</h4>
+            <p class="font-body-sm text-body-sm text-on-surface-variant">
+                Tiếp nhận phản ánh hư hỏng từ giảng viên, sinh viên, phân loại mức độ và cập nhật trạng thái xử lý; sự cố nghiêm trọng tự chuyển phòng sang bảo trì.
+            </p>
+        </div>
+        <div class="pt-2 border-t border-surface-container flex items-center justify-between">
+            <a href="/SuCo" class="font-label-md text-label-md text-error hover:underline flex items-center gap-1 font-semibold">
+                <span>Xử lý ticket sự cố</span>
+                <span class="material-symbols-outlined text-[16px]">arrow_forward</span>
+            </a>
+            <span class="px-2 py-0.5 rounded bg-error/10 text-error font-label-sm text-label-sm font-semibold">Ưu tiên xử lý</span>
+        </div>
+    </div>
+</section>
+
+<!-- System Status Footer -->
+<div class="bg-surface-container-low/50 rounded-xl p-4 border border-outline-variant/40 flex items-center justify-between text-xs text-on-surface-variant">
+    <div class="flex items-center gap-4">
+        <span class="flex items-center gap-1.5"><span class="w-2 h-2 bg-tertiary rounded-full"></span> Cơ sở dữ liệu trực tuyến</span>
+        <span class="flex items-center gap-1.5"><span class="w-2 h-2 bg-tertiary rounded-full"></span> Bộ xếp lịch đang hoạt động</span>
+    </div>
+    <div>Cập nhật lần cuối: @DateTime.Now.ToString("HH:mm:ss")</div>
+</div>
+
+@section Scripts {
+    <script>
+        setInterval(async () => {
+            try {
+                const d = await (await fetch('/api/dashboard/kpis?refresh=true')).json();
+                const tongPhong = document.getElementById('kpi-tong');
+                const dungPhong = document.getElementById('kpi-dung');
+                const suCo = document.getElementById('kpi-suco');
+                const cho = document.getElementById('kpi-cho');
+
+                if(tongPhong) tongPhong.textContent = d.tongPhong;
+                if(dungPhong) dungPhong.textContent = d.lichHomNay;
+                if(suCo) suCo.textContent = d.suCoMoi;
+                if(cho) cho.textContent = d.donDatCho + d.donNghiCho;
+            } catch (e) { console.error("Update KPI failed", e); }
+        }, 15000);
+    </script>
+}

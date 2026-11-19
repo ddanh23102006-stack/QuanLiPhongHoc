@@ -1,0 +1,866 @@
+@model IEnumerable<SuCo>
+@{
+    var laCsvc = ViewBag.LaCsvc is true;
+    ViewData["Title"] = laCsvc ? "Duyệt báo cáo sự cố" : "Báo cáo sự cố";
+    var page = (int)ViewBag.Page;
+    var soTrang = (int)ViewBag.SoTrang;
+    var tongSo = (int)ViewBag.TongSo;
+    var toa = ViewBag.Toa as int?;
+    var ttDangLoc = ViewBag.TrangThai as string;
+    var tuKhoa = ViewBag.Q as string;
+    var mucDoDangLoc = ViewBag.MucDo as string;
+    var tenToa = ViewBag.TenToa as string;
+    var soPhanHoiMoi = ViewBag.SoPhanHoiMoi as int? ?? 0;
+    var soMoi = ViewBag.SoMoi as int? ?? 0;
+    var soCanXuLy = ViewBag.SoCanXuLy as int? ?? 0;
+    var dsToa = ViewBag.DanhSachToa as List<ToaNha> ?? new List<ToaNha>();
+    var phongDich = ViewBag.PhongDieuChuyen as List<PhongHoc> ?? new List<PhongHoc>();
+    string Trang(int p) => Url.Action("Index", new { page = p, q = tuKhoa, tt = ttDangLoc, toa, mucdo = mucDoDangLoc }) ?? "/SuCo";
+    // Chuẩn hóa đường dẫn ảnh cũ (có/không có dấu / đầu) và chạy đúng khi app nằm dưới PathBase.
+    string AnhUrl(string? p) => string.IsNullOrWhiteSpace(p) ? "" : Url.Content(p.StartsWith('/') ? "~" + p : "~/" + p);
+    var mauMucDo = new Dictionary<string, string>
+    {
+        ["CRITICAL"] = "text-error bg-red-100 border-error/30",
+        ["HIGH"] = "text-error bg-red-50 border-error/30",
+        ["MEDIUM"] = "text-amber-800 bg-amber-100 border-amber-300",
+        ["LOW"] = "text-on-surface-variant bg-gray-100 border-gray-300"
+    };
+    string MauTrangThai(string tt) => tt switch
+    {
+        "RESOLVED" => "text-tertiary bg-emerald-50 border-tertiary-fixed",
+        "IN_PROGRESS" => "text-primary bg-blue-50 border-blue-200",
+        _ => "text-error bg-red-50 border-error/20"
+    };
+    string MauVienMucDo(SuCo s) => s.TrangThai == "RESOLVED" ? "border-l-tertiary"
+        : s.MucDoNghiemTrong is "CRITICAL" or "HIGH" ? "border-l-error"
+        : s.MucDoNghiemTrong == "MEDIUM" ? "border-l-amber-500" : "border-l-tertiary";
+    string NhanXuLy(string tt) => tt switch
+    {
+        "RESOLVED" => "Đã xử lý",
+        "IN_PROGRESS" => "Đang xử lý",
+        _ => "Chờ tiếp nhận"
+    };
+}
+
+<nav class="flex items-center gap-1.5 text-body-sm font-body-sm text-secondary mb-3">
+    <span class="material-symbols-outlined text-[16px]">home</span>
+    <a href="/Home" class="hover:text-primary">Trang chủ</a>
+    <span class="text-outline">/</span>
+    <span class="text-primary font-semibold">@(laCsvc ? "Duyệt báo cáo sự cố CSVC" : "Báo cáo sự cố của tôi")</span>
+</nav>
+
+<section class="pb-3 border-b border-surface-container mb-4 flex flex-col md:flex-row md:items-center justify-between gap-3">
+    <div class="flex items-start gap-3">
+        <div class="w-10 h-10 rounded-lg bg-secondary-container text-primary flex items-center justify-center flex-shrink-0">
+            <span class="material-symbols-outlined">report_problem</span>
+        </div>
+        <div>
+            <h1 class="font-headline-lg text-headline-lg font-bold @(laCsvc ? "text-primary" : "text-on-surface") uppercase tracking-tight">
+                @(laCsvc ? "Duyệt báo cáo sự cố CSVC" : "Báo cáo sự cố của tôi")
+            </h1>
+            <p class="font-body-sm text-body-sm text-on-surface-variant mt-0.5">
+                @(laCsvc
+                    ? "Tiếp nhận, thẩm định và điều phối xử lý sự cố cơ sở vật chất phòng học."
+                    : "Theo dõi tiến độ và phản hồi của CSVC cho các báo cáo bạn đã gửi.")
+            </p>
+        </div>
+    </div>
+    <div class="flex flex-wrap items-center gap-2 shrink-0">
+        @if (laCsvc)
+        {
+            <a href="/SuCo/Export@(toa is int maToa ? $"?toa={maToa}" : "")@(!string.IsNullOrWhiteSpace(ttDangLoc) ? $"{(toa is int ? "&" : "?")}tt={ttDangLoc}" : "")"
+               class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-outline-variant bg-surface-container-lowest text-on-surface hover:bg-surface-container font-label-md text-label-md font-semibold transition-colors">
+                <span class="material-symbols-outlined text-[18px]">download</span>
+                <span>Xuất Excel</span>
+            </a>
+        }
+        else
+        {
+            <a href="/SuCo/Create" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary text-on-primary hover:bg-primary-container font-label-md text-label-md font-semibold transition-colors">
+                <span class="material-symbols-outlined text-[18px]">add_alert</span>
+                <span>Báo cáo sự cố</span>
+            </a>
+        }
+    </div>
+</section>
+
+@if (!laCsvc && soPhanHoiMoi > 0)
+{
+    <div class="mb-space-md px-space-md py-3 rounded-xl bg-tertiary-container/20 border border-tertiary/30 text-sm">
+        <b>Bạn có @soPhanHoiMoi phản hồi mới từ CSVC.</b> Xem kết quả xử lý ngay bên dưới — CSVC đã cập nhật tình trạng phòng hoặc thiết bị bạn báo.
+    </div>
+}
+
+@if (laCsvc)
+{
+    <form method="get" asp-action="Index" class="bg-surface-container-lowest border border-surface-container-highest p-3 rounded-lg shadow-sm mb-4">
+        <div class="grid grid-cols-1 md:grid-cols-12 gap-2.5 items-center">
+            <div class="md:col-span-4 relative">
+                <span class="absolute inset-y-0 left-0 pl-2.5 flex items-center pointer-events-none text-secondary">
+                    <span class="material-symbols-outlined text-[18px]">search</span>
+                </span>
+                <input name="q" value="@tuKhoa" placeholder="Tìm theo mã sự cố (#SC-...), phòng, người báo..."
+                       class="w-full pl-8 pr-3 py-1.5 text-body-sm bg-surface border border-surface-container-highest rounded-lg focus:outline-none focus:border-primary text-on-surface" />
+            </div>
+            <div class="md:col-span-3">
+                <select name="toa" class="w-full py-1.5 px-2.5 text-body-sm bg-surface border border-surface-container-highest rounded-lg focus:outline-none focus:border-primary text-on-surface">
+                    <option value="">Khu vực: Tất cả</option>
+                    @foreach (var t in dsToa)
+                    {
+                        <option value="@t.MaToaNha" selected="@(toa == t.MaToaNha)">@t.CodeToaNha — @t.TenToaNha</option>
+                    }
+                </select>
+            </div>
+            <div class="md:col-span-2">
+                <select name="mucdo" class="w-full py-1.5 px-2.5 text-body-sm bg-surface border border-surface-container-highest rounded-lg focus:outline-none focus:border-primary text-on-surface">
+                    <option value="">Mức độ: Tất cả</option>
+                    @foreach (var kv in Catalogs.MucDoSuCo)
+                    {
+                        <option value="@kv.Key" selected="@(mucDoDangLoc == kv.Key)">@kv.Value</option>
+                    }
+                </select>
+            </div>
+            <div class="md:col-span-3">
+                <select name="tt" class="w-full py-1.5 px-2.5 text-body-sm bg-surface border border-surface-container-highest rounded-lg focus:outline-none focus:border-primary text-on-surface">
+                    <option value="">Trạng thái: Tất cả</option>
+                    @foreach (var kv in Catalogs.TrangThaiSuCo)
+                    {
+                        <option value="@kv.Key" selected="@(ttDangLoc == kv.Key)">@kv.Value</option>
+                    }
+                </select>
+            </div>
+            <div class="md:col-span-12 lg:col-span-12 flex items-center gap-1.5 justify-end">
+                @if (!string.IsNullOrWhiteSpace(tuKhoa) || !string.IsNullOrWhiteSpace(ttDangLoc) || !string.IsNullOrWhiteSpace(mucDoDangLoc) || toa != null)
+                {
+                    <a href="@Url.Action("Index")" class="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg border border-outline-variant text-on-surface-variant hover:bg-surface-container text-body-sm transition-colors">
+                        <span class="material-symbols-outlined text-[18px]">filter_alt_off</span>
+                        <span>Xóa lọc</span>
+                    </a>
+                }
+                <button class="bg-primary hover:bg-primary-container text-on-primary py-1.5 px-3 rounded-lg flex items-center justify-center gap-1.5 font-label-md text-label-md font-semibold transition-colors">
+                    <span class="material-symbols-outlined text-[18px]">filter_alt</span>
+                    <span>Lọc sự cố</span>
+                </button>
+            </div>
+        </div>
+    </form>
+
+    <div class="flex flex-wrap items-center justify-between gap-2 px-1 pb-2">
+        <div class="flex flex-wrap items-center gap-2">
+            <span class="font-label-md text-label-md text-secondary uppercase font-bold">Danh sách đơn báo cáo sự cố cơ sở vật chất</span>
+            @if (soCanXuLy > 0)
+            {
+                <span class="bg-error-container text-error font-label-sm text-[11px] px-2 py-0.5 rounded font-bold border border-error/20">@soCanXuLy sự cố cần xử lý</span>
+            }
+            @if (soMoi > 0)
+            {
+                <span class="bg-red-50 text-error font-label-sm text-[11px] px-2 py-0.5 rounded font-semibold border border-red-200">@soMoi mới tiếp nhận</span>
+            }
+        </div>
+        <span class="text-body-sm text-[12px] text-secondary">
+            Hiển thị @Model.Count()/@tongSo sự cố · Sắp xếp: Mức độ ưu tiên
+            @if (!string.IsNullOrWhiteSpace(tenToa))
+            {
+                <text> · Tòa nhà @tenToa</text>
+            }
+        </span>
+    </div>
+
+    <div class="space-y-3">
+        @if (!Model.Any())
+        {
+            <div class="bg-surface-container-lowest border border-surface-container-highest rounded-lg p-8 text-center text-on-surface-variant">
+                <span class="material-symbols-outlined text-[32px] text-outline">inbox</span>
+                <p class="font-semibold mt-1">Không có báo cáo sự cố nào khớp bộ lọc.</p>
+            </div>
+        }
+        @foreach (var s in Model)
+        {
+            var tenBaoCao = s.HoTenNguoiBaoCao ?? s.NguoiBaoCaoNav?.HoTen ?? s.NguoiBaoCao ?? "—";
+            var loaiNguoiBao = s.DoiTuongBaoCao == "GIANG_VIEN" ? "Giảng viên" : "Sinh viên";
+            var coAnh = !string.IsNullOrWhiteSpace(s.AnhDinhKem);
+            var dangXuLy = s.TrangThai == "IN_PROGRESS";
+            <div class="bg-surface-container-lowest border-l-4 @MauVienMucDo(s) border border-surface-container-highest rounded-lg p-4 shadow-sm hover:border-primary transition-all flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+                <div class="flex-1 grid grid-cols-1 md:grid-cols-12 gap-3 items-center">
+                    <div class="md:col-span-3 min-w-0">
+                        <div class="flex items-center gap-2 flex-wrap">
+                            <span class="font-headline-sm text-headline-sm font-bold @(s.MucDoNghiemTrong is "CRITICAL" or "HIGH" && s.TrangThai != "RESOLVED" ? "text-error" : "text-on-surface")">#SC-@s.MaSuCo.ToString("D5")</span>
+                            <span class="font-label-sm text-label-sm px-2 py-0.5 rounded border font-bold uppercase @(mauMucDo.GetValueOrDefault(s.MucDoNghiemTrong ?? "", "text-on-surface-variant bg-surface-container border-outline-variant"))">
+                                @Catalogs.Label(Catalogs.MucDoSuCo, s.MucDoNghiemTrong)
+                            </span>
+                        </div>
+                        <div class="text-secondary text-[12px] mt-1 flex items-center gap-1">
+                            <span class="material-symbols-outlined text-[14px]">schedule</span>
+                            <span>Báo lúc @s.NgayTao.ToString("dd/MM/yyyy HH:mm")</span>
+                        </div>
+                        <div class="mt-1">
+                            <span class="font-label-sm text-label-sm px-2 py-0.5 rounded border font-semibold @MauTrangThai(s.TrangThai)">@Catalogs.Label(Catalogs.TrangThaiSuCo, s.TrangThai)</span>
+                        </div>
+                    </div>
+                    <div class="md:col-span-4 space-y-1 min-w-0">
+                        <div class="flex items-center gap-1.5 flex-wrap text-on-surface">
+                            <span class="material-symbols-outlined text-[16px] text-primary">location_on</span>
+                            <span class="font-bold">@(s.PhongHoc?.CodePhong ?? "Chưa xác định phòng")</span>
+                            @if (s.PhongHoc?.ToaNha != null)
+                            {
+                                <span class="text-secondary text-[12px]">(@s.PhongHoc.ToaNha.CodeToaNha — @s.PhongHoc.ToaNha.TenToaNha)</span>
+                            }
+                        </div>
+                        <div class="text-body-sm text-on-surface font-semibold flex items-start gap-1">
+                            <span class="material-symbols-outlined text-[16px] @(s.MucDoNghiemTrong is "CRITICAL" or "HIGH" ? "text-error" : "text-primary")">build</span>
+                            <span class="line-clamp-2">@Catalogs.LabelLoaiSuCo(s.LoaiSuCo)@(string.IsNullOrWhiteSpace(s.MoTa) ? "" : $" — {s.MoTa}")</span>
+                        </div>
+                        <div class="text-secondary text-[12px]">
+                            Người báo: <b class="text-on-surface">@tenBaoCao</b> (@loaiNguoiBao · @s.NguoiBaoCao)
+                            @if (!string.IsNullOrWhiteSpace(s.SoDienThoaiLienHe))
+                            {
+                                <text> · @s.SoDienThoaiLienHe</text>
+                            }
+                        </div>
+                    </div>
+                    <div class="md:col-span-5 bg-surface-container-low/70 p-2.5 rounded-lg border border-surface-container space-y-1.5">
+                        <div class="flex items-start justify-between gap-2 text-[12px]">
+                            <span class="text-secondary font-medium shrink-0">Ảnh hiện trường:</span>
+                            @if (coAnh)
+                            {
+                                <button type="button" data-anh="@AnhUrl(s.AnhDinhKem)" data-anh-mo-ta="Ảnh sự cố #SC-@s.MaSuCo.ToString("D5") — @(s.PhongHoc?.CodePhong ?? "")"
+                                        class="js-xem-anh inline-flex items-center gap-2 rounded border border-outline-variant bg-surface-container-lowest px-1.5 py-1 hover:border-primary transition-colors">
+                                    <img src="@AnhUrl(s.AnhDinhKem)" alt="Ảnh hiện trường sự cố" loading="lazy" class="h-10 w-14 rounded border border-surface-container object-cover bg-surface-container-low" />
+                                    <span class="text-primary font-semibold">Xem ảnh</span>
+                                    <span class="material-symbols-outlined text-[15px] text-primary">zoom_in</span>
+                                </button>
+                            }
+                            else
+                            {
+                                <span class="text-on-surface-variant">Không đính kèm</span>
+                            }
+                        </div>
+                        <div class="flex items-center justify-between gap-2 text-[12px]">
+                            <span class="text-secondary font-medium">Người xử lý:</span>
+                            <span class="font-semibold @(s.NguoiXuLyNav != null ? "text-primary" : "text-error")">
+                                @(s.NguoiXuLyNav?.HoTen ?? "Chưa phân công")
+                            </span>
+                        </div>
+                        <div class="flex items-center justify-between gap-2 text-[12px]">
+                            <span class="text-secondary font-medium">Kết quả:</span>
+                            @if (s.KetQuaXuLy != null)
+                            {
+                                <span class="font-semibold @(s.KetQuaXuLy == "RESTORED" ? "text-tertiary" : "text-primary")">@Catalogs.Label(Catalogs.KetQuaSuCo, s.KetQuaXuLy)</span>
+                            }
+                            else
+                            {
+                                <span class="text-on-surface-variant font-medium">Chưa cập nhật</span>
+                            }
+                        </div>
+                    </div>
+                </div>
+                <div class="flex items-center gap-2 pt-2 lg:pt-0 border-t lg:border-t-0 border-surface-container shrink-0">
+                    <button type="button" data-mo-modal="su-co-@s.MaSuCo"
+                            class="w-full lg:w-auto inline-flex items-center justify-center gap-1.5 px-4 py-2 rounded-lg font-label-md text-label-md transition-colors @(s.TrangThai == "NEW" ? "bg-primary text-on-primary hover:bg-primary-container font-bold shadow-sm" : "bg-surface-container-lowest border border-outline-variant hover:border-primary text-primary font-semibold")">
+                        <span class="material-symbols-outlined text-[18px]">@(s.TrangThai == "NEW" ? "person_add" : s.TrangThai == "IN_PROGRESS" ? "sync_alt" : "history")</span>
+                        <span>@(s.TrangThai == "NEW" ? "Tiếp nhận & Xử lý" : s.TrangThai == "IN_PROGRESS" ? "Cập nhật tiến độ" : "Xem lại xử lý")</span>
+                    </button>
+                </div>
+            </div>
+
+            <div id="su-co-@s.MaSuCo" class="fixed inset-0 z-50 bg-inverse-surface/50 backdrop-blur-xs items-center justify-center p-3 hidden">
+                <div class="bg-surface-container-lowest w-full max-w-2xl rounded-xl shadow-2xl border border-surface-container-highest overflow-hidden max-h-[90vh] flex flex-col">
+                    <div class="bg-primary-container px-4 py-3 flex items-center justify-between text-on-primary shrink-0">
+                        <div class="flex items-center gap-2">
+                            <span class="material-symbols-outlined text-[20px]">engineering</span>
+                            <h2 class="font-headline-sm text-headline-sm font-bold">Xử lý báo cáo sự cố CSVC</h2>
+                        </div>
+                        <button type="button" data-dong-modal class="text-on-primary-container hover:text-on-primary transition-colors">
+                            <span class="material-symbols-outlined">close</span>
+                        </button>
+                    </div>
+                    <div class="p-4 space-y-4 overflow-y-auto flex-1">
+                        <div class="bg-surface-container-low p-3 rounded-lg border border-surface-container-high grid grid-cols-1 md:grid-cols-2 gap-3">
+                            <div class="space-y-2">
+                                <div>
+                                    <span class="text-[11px] uppercase tracking-wider text-secondary font-bold">Mã sự cố:</span>
+                                    <div class="font-headline-sm text-headline-sm font-bold text-error">#SC-@s.MaSuCo.ToString("D5")</div>
+                                </div>
+                                <div>
+                                    <span class="text-[11px] uppercase tracking-wider text-secondary font-bold">Vị trí phòng học:</span>
+                                    <div class="font-label-md text-label-md font-bold text-on-surface">
+                                        @(s.PhongHoc?.CodePhong ?? "—")
+                                        @if (s.PhongHoc?.ToaNha != null)
+                                        {
+                                            <span class="font-normal text-secondary">(@s.PhongHoc.ToaNha.CodeToaNha — @s.PhongHoc.ToaNha.TenToaNha)</span>
+                                        }
+                                    </div>
+                                    <div class="text-body-sm text-secondary text-[12px]">Loại phòng: @Catalogs.Label(Catalogs.LoaiPhong, s.PhongHoc?.LoaiPhong)</div>
+                                </div>
+                                <div>
+                                    <span class="text-[11px] uppercase tracking-wider text-secondary font-bold">Người báo cáo:</span>
+                                    <div class="font-label-md text-label-md font-bold text-on-surface">@tenBaoCao</div>
+                                    <div class="text-body-sm text-secondary text-[12px]">@loaiNguoiBao · Mã số: @s.NguoiBaoCao</div>
+                                    <div class="text-body-sm text-secondary text-[12px]">SĐT: @(string.IsNullOrWhiteSpace(s.SoDienThoaiLienHe) ? "Chưa cung cấp" : s.SoDienThoaiLienHe)</div>
+                                </div>
+                            </div>
+                            <div class="space-y-2 border-t md:border-t-0 md:border-l border-surface-container-high md:pl-3 pt-2 md:pt-0">
+                                <div>
+                                    <span class="text-[11px] uppercase tracking-wider text-secondary font-bold">Mức độ ưu tiên:</span>
+                                    <div>
+                                        <span class="font-label-sm text-label-sm px-2.5 py-0.5 rounded border font-bold uppercase inline-block mt-0.5 @(mauMucDo.GetValueOrDefault(s.MucDoNghiemTrong ?? "", "text-on-surface-variant bg-surface-container border-outline-variant"))">
+                                            @Catalogs.Label(Catalogs.MucDoSuCo, s.MucDoNghiemTrong)
+                                        </span>
+                                    </div>
+                                </div>
+                                <div>
+                                    <span class="text-[11px] uppercase tracking-wider text-secondary font-bold">Loại sự cố:</span>
+                                    <div class="text-body-sm text-on-surface font-medium">@Catalogs.LabelLoaiSuCo(s.LoaiSuCo)</div>
+                                </div>
+                                <div>
+                                    <span class="text-[11px] uppercase tracking-wider text-secondary font-bold">Mô tả chi tiết:</span>
+                                    <div class="text-body-sm text-on-surface font-medium">@(string.IsNullOrWhiteSpace(s.MoTa) ? "—" : s.MoTa)</div>
+                                </div>
+                                <div class="text-[11px] text-secondary flex items-center gap-1">
+                                    <span class="material-symbols-outlined text-[14px]">schedule</span>
+                                    Báo lúc @s.NgayTao.ToString("dd/MM/yyyy HH:mm")
+                                </div>
+                            </div>
+                        </div>
+
+                        @if (!string.IsNullOrWhiteSpace(s.NoiDungGopY))
+                        {
+                            <div class="rounded-lg border border-outline-variant/70 px-3 py-2">
+                                <p class="text-[11px] uppercase tracking-wider text-secondary font-bold">Góp ý / Đề xuất của người báo cáo</p>
+                                <p class="text-body-sm text-on-surface mt-0.5">@s.NoiDungGopY</p>
+                            </div>
+                        }
+
+                        @if (s.ChiTietSuCos.Any(x => x.PhongThietBi != null))
+                        {
+                            <div>
+                                <p class="text-[11px] uppercase tracking-wider text-secondary font-bold mb-1">Thiết bị liên quan</p>
+                                <div class="flex flex-wrap gap-1.5">
+                                    @foreach (var ct in s.ChiTietSuCos.Where(x => x.PhongThietBi != null))
+                                    {
+                                        <span class="inline-flex items-center gap-1 px-2 py-1 rounded border border-surface-container bg-surface text-[12px]">
+                                            <span class="material-symbols-outlined text-[15px] text-primary">devices</span>
+                                            @ct.PhongThietBi?.NhanDienThietBi (@ct.PhongThietBi?.ThietBi?.TenThietBi)
+                                        </span>
+                                    }
+                                </div>
+                            </div>
+                        }
+
+                        @if (coAnh)
+                        {
+                            <div>
+                                <div class="flex items-center justify-between mb-1">
+                                    <p class="text-[11px] uppercase tracking-wider text-secondary font-bold">Ảnh hiện trường do người dùng gửi</p>
+                                    <a href="@AnhUrl(s.AnhDinhKem)" target="_blank" rel="noopener" class="inline-flex items-center gap-1 text-[12px] text-primary hover:underline">
+                                        <span class="material-symbols-outlined text-[15px]">open_in_new</span>
+                                        Mở tab mới
+                                    </a>
+                                </div>
+                                <button type="button" data-anh="@AnhUrl(s.AnhDinhKem)" data-anh-mo-ta="Ảnh sự cố #SC-@s.MaSuCo.ToString("D5") — @(s.PhongHoc?.CodePhong ?? "")"
+                                        class="js-xem-anh block w-full rounded-lg border border-surface-container-highest overflow-hidden bg-surface-container-low hover:border-primary transition-colors">
+                                    <img src="@AnhUrl(s.AnhDinhKem)" alt="Ảnh hiện trường sự cố" loading="lazy" class="w-full max-h-64 object-contain bg-surface-container-low" />
+                                </button>
+                                <p class="text-[11px] text-secondary mt-1 flex items-center gap-1">
+                                    <span class="material-symbols-outlined text-[14px]">zoom_in</span>
+                                    Nhấp vào ảnh để xem ở kích thước đầy đủ.
+                                </p>
+                            </div>
+                        }
+
+                        <form asp-action="XuLy" method="post" class="js-xuly-form space-y-3 border-t border-surface-container pt-3">
+                            @Html.AntiForgeryToken()
+                            <input type="hidden" name="MaSuCo" value="@s.MaSuCo" />
+                            <input type="hidden" name="ReturnUrl" value="@Trang(page)" />
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                <div>
+                                    <label class="block font-label-md text-label-md text-on-surface font-bold mb-1 text-[12px]" for="danhgia-@s.MaSuCo">Đánh giá sau kiểm tra:</label>
+                                    <textarea id="danhgia-@s.MaSuCo" name="DanhGia" rows="2"
+                                              class="w-full text-body-sm p-2.5 bg-surface border border-surface-container-highest rounded-lg focus:outline-none focus:border-primary text-on-surface"
+                                              placeholder="VD: Bóng đèn hỏng do chấn lưu, đã thay thế.">@s.DanhGia</textarea>
+                                </div>
+                                <div class="space-y-2">
+                                    <div>
+                                        <label class="block font-label-md text-label-md text-on-surface font-bold mb-1 text-[12px]" for="trangthai-@s.MaSuCo">Cập nhật trạng thái sự cố:</label>
+                                        <select id="trangthai-@s.MaSuCo" name="TrangThai" class="w-full py-2 px-3 text-body-sm bg-surface border border-surface-container-highest rounded-lg focus:outline-none focus:border-primary text-on-surface">
+                                            @foreach (var kv in Catalogs.TrangThaiSuCo)
+                                            {
+                                                <option value="@kv.Key" selected="@(kv.Key == s.TrangThai)">@kv.Value</option>
+                                            }
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label class="block font-label-md text-label-md text-on-surface font-bold mb-1 text-[12px]" for="ketqua-@s.MaSuCo">Kết quả gửi người báo cáo:</label>
+                                        <select id="ketqua-@s.MaSuCo" name="KetQua" class="kq-select w-full py-2 px-3 text-body-sm bg-surface border border-surface-container-highest rounded-lg focus:outline-none focus:border-primary text-on-surface">
+                                            <option value="">— Chỉ cập nhật đánh giá / trạng thái —</option>
+                                            @foreach (var kv in Catalogs.KetQuaSuCo)
+                                            {
+                                                <option value="@kv.Key" selected="@(s.KetQuaXuLy == kv.Key)">@kv.Value</option>
+                                            }
+                                        </select>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="phong-dich hidden">
+                                <label class="block font-label-md text-label-md text-on-surface font-bold mb-1 text-[12px]" for="phongdich-@s.MaSuCo">Phòng:</label>
+                                <div class="grid grid-cols-1 sm:grid-cols-[minmax(0,220px)_minmax(0,1fr)] gap-2">
+                                    <select class="loc-loai-phong w-full py-2 px-3 text-body-sm bg-surface border border-surface-container-highest rounded-lg focus:outline-none focus:border-primary text-on-surface" aria-label="Lọc phòng theo loại phòng">
+                                        <option value="">Tất cả loại phòng</option>
+                                        @foreach (var loai in phongDich.Select(x => x.LoaiPhong).Distinct())
+                                        {
+                                            <option value="@loai">@Catalogs.LabelLoaiPhong(loai)</option>
+                                        }
+                                    </select>
+                                    <select id="phongdich-@s.MaSuCo" name="PhongDieuChuyen" class="w-full py-2 px-3 text-body-sm bg-surface border border-surface-container-highest rounded-lg focus:outline-none focus:border-primary text-on-surface">
+                                        <option value="">— Chọn phòng —</option>
+                                        @foreach (var p in phongDich)
+                                        {
+                                            <option value="@p.MaPhong" data-loai="@p.LoaiPhong" selected="@(s.PhongDieuChuyen == p.MaPhong)">@p.CodePhong</option>
+                                        }
+                                    </select>
+                                </div>
+                                <span class="dem-phong-dich text-[11px] text-secondary mt-0.5 block">Chọn loại phòng để lọc nhanh danh sách phòng.</span>
+                            </div>
+                            <div>
+                                <label class="block font-label-md text-label-md text-on-surface font-bold mb-1 text-[12px]" for="thongbao-@s.MaSuCo">Nội dung thông báo gửi người báo cáo:</label>
+                                <textarea id="thongbao-@s.MaSuCo" name="ThongBao" rows="3"
+                                          class="w-full text-body-sm p-2.5 bg-surface border border-surface-container-highest rounded-lg focus:outline-none focus:border-primary text-on-surface leading-relaxed"
+                                          placeholder="Để trống sẽ dùng nội dung mặc định theo kết quả.">@s.ThongBaoPhanHoi</textarea>
+                                <span class="text-[11px] text-secondary mt-0.5 block">“Đã phục hồi” đưa thiết bị/phòng về trạng thái tốt; “Điều chuyển phòng” chuyển thiết bị sang phòng đã chọn. Thông báo hiển thị cho người báo cáo.</span>
+                            </div>
+                            <div class="flex flex-col sm:flex-row sm:items-center justify-end gap-2 border-t border-surface-container pt-3">
+                                <button type="button" data-dong-modal class="px-4 py-1.5 bg-surface-container-lowest border border-outline-variant hover:bg-surface-container text-on-surface rounded-lg font-label-md text-label-md transition-colors">Đóng lại</button>
+                                <button type="submit" class="px-5 py-2 bg-primary hover:bg-primary-container text-on-primary rounded-lg font-label-md text-label-md font-bold flex items-center justify-center gap-1.5 shadow transition-all">
+                                    <span class="material-symbols-outlined text-[18px]">assignment_turned_in</span>
+                                    <span>Lưu &amp; Gửi thông báo</span>
+                                </button>
+                            </div>
+                        </form>
+
+                        @if (!string.IsNullOrWhiteSpace(s.DanhGia) || s.NguoiXuLyNav != null)
+                        {
+                            <div class="rounded-lg bg-surface-container-low px-3 py-2 text-[12px] text-secondary">
+                                Xử lý gần nhất bởi <b class="text-on-surface">@(s.NguoiXuLyNav?.HoTen ?? "CSVC")</b>
+                                @if (s.NgayXuLy is DateTime ngay)
+                                {
+                                    <text>· @ngay.ToString("dd/MM/yyyy HH:mm")</text>
+                                }
+                            </div>
+                        }
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+
+    @if (soTrang > 1)
+    {
+        <nav class="flex items-center justify-center gap-1.5 text-sm mt-4">
+            @if (page > 1)
+            {
+                <a href="@Trang(page - 1)" class="px-3 py-1.5 rounded-lg border border-outline-variant text-on-surface-variant hover:bg-surface-container-low">‹ Trước</a>
+            }
+            @for (var p = 1; p <= soTrang; p++)
+            {
+                <a href="@Trang(p)" class="px-3 py-1.5 rounded-lg border @(p == page ? "bg-primary text-on-primary border-primary font-semibold" : "border-outline-variant text-on-surface-variant hover:bg-surface-container-low")">@p</a>
+            }
+            @if (page < soTrang)
+            {
+                <a href="@Trang(page + 1)" class="px-3 py-1.5 rounded-lg border border-outline-variant text-on-surface-variant hover:bg-surface-container-low">Sau ›</a>
+            }
+        </nav>
+    }
+}
+else
+{
+    <form method="get" asp-action="Index" class="flex flex-wrap items-center gap-2 mb-space-md bg-surface-container-lowest border border-surface-container-highest p-3 rounded-lg shadow-sm">
+        <select name="tt" class="rounded-lg bg-surface-container-low px-3 py-2 text-sm border border-surface-container-highest">
+            <option value="">Tất cả trạng thái</option>
+            @foreach (var kv in Catalogs.TrangThaiSuCo)
+            {
+                <option value="@kv.Key" selected="@(ttDangLoc == kv.Key)">@kv.Value</option>
+            }
+        </select>
+        <button class="px-3 py-2 bg-primary text-on-primary rounded-lg text-sm font-semibold">Lọc</button>
+        @if (!string.IsNullOrWhiteSpace(ttDangLoc))
+        {
+            <a href="/SuCo" class="px-3 py-2 rounded-lg bg-surface-container text-on-surface text-sm">Xóa lọc</a>
+        }
+        <span class="ml-auto text-xs text-on-surface-variant">Hiển thị @Model.Count()/@tongSo đơn đã gửi</span>
+    </form>
+
+    <div class="bg-surface-container-lowest rounded-xl shadow-sm border border-surface-container-highest overflow-hidden">
+        <div class="flex items-center justify-between gap-2 px-4 py-3 border-b border-surface-container bg-surface-container-low/50">
+            <span class="font-label-md text-label-md text-secondary uppercase font-bold">Đơn báo cáo đã gửi</span>
+            <span class="text-[12px] text-secondary">Thông tin chính · bấm “Xem chi tiết” để xem đánh giá &amp; thông báo của CSVC</span>
+        </div>
+
+        @if (!Model.Any())
+        {
+            <div class="p-8 text-center text-on-surface-variant">
+                <span class="material-symbols-outlined text-[32px] text-outline">inbox</span>
+                <p class="font-semibold mt-1">Chưa có báo cáo nào.</p>
+                <p class="text-sm mt-1">Gửi báo cáo khi phòng hoặc thiết bị gặp sự cố để CSVC tiếp nhận.</p>
+            </div>
+        }
+        else
+        {
+            <div class="divide-y divide-surface-container">
+                @foreach (var s in Model)
+                {
+                    var nguoiGui = s.HoTenNguoiBaoCao ?? s.NguoiBaoCaoNav?.HoTen ?? s.NguoiBaoCao ?? "—";
+                    var loaiNguoi = s.DoiTuongBaoCao == "GIANG_VIEN" ? "Giảng viên" : "Sinh viên";
+                    var dsThietBi = s.ChiTietSuCos.Where(x => x.PhongThietBi != null).ToList();
+                    <div class="px-4 py-3 flex flex-col lg:flex-row lg:items-center gap-3 hover:bg-surface-container-low/40 transition-colors">
+                        <div class="flex-1 grid grid-cols-2 lg:grid-cols-12 gap-3 items-center min-w-0">
+                            <div class="lg:col-span-2 min-w-0">
+                                <div class="font-bold text-on-surface text-sm">#SC-@s.MaSuCo.ToString("D5")</div>
+                                <div class="text-[11px] text-secondary flex items-center gap-1 mt-0.5">
+                                    <span class="material-symbols-outlined text-[13px]">schedule</span>
+                                    @s.NgayTao.ToString("dd/MM/yyyy HH:mm")
+                                </div>
+                                @if (!string.IsNullOrWhiteSpace(s.AnhDinhKem))
+                                {
+                                    <span class="inline-flex items-center gap-0.5 text-[11px] text-primary mt-0.5">
+                                        <span class="material-symbols-outlined text-[13px]">photo_camera</span>Có ảnh
+                                    </span>
+                                }
+                            </div>
+                            <div class="lg:col-span-2 min-w-0">
+                                <div class="text-[11px] uppercase tracking-wider text-secondary font-bold">Vị trí</div>
+                                <div class="text-sm font-semibold text-on-surface truncate">@(s.PhongHoc?.CodePhong ?? "—")</div>
+                                @if (s.PhongHoc?.ToaNha != null)
+                                {
+                                    <div class="text-[11px] text-secondary truncate">@s.PhongHoc.ToaNha.CodeToaNha — @s.PhongHoc.ToaNha.TenToaNha</div>
+                                }
+                            </div>
+                            <div class="lg:col-span-3 min-w-0">
+                                <div class="text-[11px] uppercase tracking-wider text-secondary font-bold">Loại sự cố</div>
+                                <div class="text-sm font-semibold text-on-surface line-clamp-1">@Catalogs.LabelLoaiSuCo(s.LoaiSuCo)</div>
+                                <span class="inline-block mt-0.5 px-1.5 py-0.5 rounded border font-semibold text-[11px] @(mauMucDo.GetValueOrDefault(s.MucDoNghiemTrong ?? "", "text-on-surface-variant bg-surface-container border-outline-variant"))">
+                                    @Catalogs.Label(Catalogs.MucDoSuCo, s.MucDoNghiemTrong)
+                                </span>
+                            </div>
+                            <div class="lg:col-span-2 min-w-0">
+                                <div class="text-[11px] uppercase tracking-wider text-secondary font-bold">Thiết bị</div>
+                                @if (dsThietBi.Any())
+                                {
+                                    <div class="text-[12px] text-on-surface line-clamp-2">
+                                        @string.Join(", ", dsThietBi.Select(x => x.PhongThietBi?.ThietBi?.TenThietBi ?? x.PhongThietBi?.NhanDienThietBi))
+                                    </div>
+                                }
+                                else
+                                {
+                                    <div class="text-[12px] text-on-surface-variant">Không chỉ định</div>
+                                }
+                            </div>
+                            <div class="lg:col-span-3 min-w-0">
+                                <div class="text-[11px] uppercase tracking-wider text-secondary font-bold">Người gửi</div>
+                                <div class="text-sm font-semibold text-on-surface truncate">@nguoiGui</div>
+                                <div class="text-[11px] text-secondary truncate">@loaiNguoi · @s.NguoiBaoCao</div>
+                            </div>
+                        </div>
+                        <div class="flex items-center gap-2 shrink-0 lg:justify-end">
+                            <span class="px-2 py-1 rounded border font-semibold text-[11px] whitespace-nowrap @MauTrangThai(s.TrangThai)">
+                                @NhanXuLy(s.TrangThai)
+                            </span>
+                            <button type="button" data-mo-modal="chi-tiet-@s.MaSuCo"
+                                    class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-outline-variant bg-surface-container-lowest text-primary hover:border-primary hover:bg-surface-container font-label-md text-label-md font-semibold transition-colors">
+                                <span class="material-symbols-outlined text-[18px]">visibility</span>
+                                <span>Xem chi tiết</span>
+                            </button>
+                        </div>
+                    </div>
+                }
+            </div>
+        }
+    </div>
+
+    @if (soTrang > 1)
+    {
+        <nav class="flex items-center justify-center gap-1.5 text-sm mt-space-md">
+            @if (page > 1)
+            {
+                <a href="@Trang(page - 1)" class="px-3 py-1.5 rounded-lg border border-outline-variant text-on-surface-variant hover:bg-surface-container-low">‹ Trước</a>
+            }
+            @for (var p = 1; p <= soTrang; p++)
+            {
+                <a href="@Trang(p)" class="px-3 py-1.5 rounded-lg border @(p == page ? "bg-primary text-on-primary border-primary font-semibold" : "border-outline-variant text-on-surface-variant hover:bg-surface-container-low")">@p</a>
+            }
+            @if (page < soTrang)
+            {
+                <a href="@Trang(page + 1)" class="px-3 py-1.5 rounded-lg border border-outline-variant text-on-surface-variant hover:bg-surface-container-low">Sau ›</a>
+            }
+        </nav>
+    }
+
+    @foreach (var s in Model)
+    {
+        var nguoiGui = s.HoTenNguoiBaoCao ?? s.NguoiBaoCaoNav?.HoTen ?? s.NguoiBaoCao ?? "—";
+        var loaiNguoi = s.DoiTuongBaoCao == "GIANG_VIEN" ? "Giảng viên" : "Sinh viên";
+        var dsThietBi = s.ChiTietSuCos.Where(x => x.PhongThietBi != null).ToList();
+        <div id="chi-tiet-@s.MaSuCo" class="fixed inset-0 z-50 bg-inverse-surface/50 backdrop-blur-xs items-center justify-center p-3 hidden">
+            <div class="bg-surface-container-lowest w-full max-w-2xl rounded-xl shadow-2xl border border-surface-container-highest overflow-hidden max-h-[90vh] flex flex-col">
+                <div class="bg-primary-container px-4 py-3 flex items-center justify-between text-on-primary shrink-0">
+                    <div class="flex items-center gap-2 min-w-0">
+                        <span class="material-symbols-outlined text-[20px]">description</span>
+                        <h2 class="font-headline-sm text-headline-sm font-bold truncate">Chi tiết báo cáo #SC-@s.MaSuCo.ToString("D5")</h2>
+                    </div>
+                    <button type="button" data-dong-modal class="text-on-primary-container hover:text-on-primary transition-colors shrink-0">
+                        <span class="material-symbols-outlined">close</span>
+                    </button>
+                </div>
+                <div class="p-4 space-y-4 overflow-y-auto flex-1">
+                    <div class="bg-surface-container-low p-3 rounded-lg border border-surface-container-high grid grid-cols-1 md:grid-cols-2 gap-3">
+                        <div class="space-y-2">
+                            <div>
+                                <span class="text-[11px] uppercase tracking-wider text-secondary font-bold">Vị trí phòng học:</span>
+                                <div class="font-label-md text-label-md font-bold text-on-surface">
+                                    @(s.PhongHoc?.CodePhong ?? "—")
+                                    @if (s.PhongHoc?.ToaNha != null)
+                                    {
+                                        <span class="font-normal text-secondary">(@s.PhongHoc.ToaNha.CodeToaNha — @s.PhongHoc.ToaNha.TenToaNha)</span>
+                                    }
+                                </div>
+                            </div>
+                            <div>
+                                <span class="text-[11px] uppercase tracking-wider text-secondary font-bold">Người gửi:</span>
+                                <div class="font-label-md text-label-md font-bold text-on-surface">@nguoiGui</div>
+                                <div class="text-body-sm text-secondary text-[12px]">@loaiNguoi · Mã số: @s.NguoiBaoCao</div>
+                                <div class="text-body-sm text-secondary text-[12px]">SĐT: @(string.IsNullOrWhiteSpace(s.SoDienThoaiLienHe) ? "Chưa cung cấp" : s.SoDienThoaiLienHe)</div>
+                            </div>
+                            <div class="text-[11px] text-secondary flex items-center gap-1">
+                                <span class="material-symbols-outlined text-[14px]">schedule</span>
+                                Gửi lúc @s.NgayTao.ToString("dd/MM/yyyy HH:mm")
+                            </div>
+                        </div>
+                        <div class="space-y-2 border-t md:border-t-0 md:border-l border-surface-container-high md:pl-3 pt-2 md:pt-0">
+                            <div>
+                                <span class="text-[11px] uppercase tracking-wider text-secondary font-bold">Loại sự cố:</span>
+                                <div class="text-body-sm text-on-surface font-semibold">@Catalogs.LabelLoaiSuCo(s.LoaiSuCo)</div>
+                            </div>
+                            <div>
+                                <span class="text-[11px] uppercase tracking-wider text-secondary font-bold">Mức độ ảnh hưởng:</span>
+                                <div>
+                                    <span class="font-label-sm text-label-sm px-2.5 py-0.5 rounded border font-bold uppercase inline-block mt-0.5 @(mauMucDo.GetValueOrDefault(s.MucDoNghiemTrong ?? "", "text-on-surface-variant bg-surface-container border-outline-variant"))">
+                                        @Catalogs.Label(Catalogs.MucDoSuCo, s.MucDoNghiemTrong)
+                                    </span>
+                                </div>
+                            </div>
+                            <div>
+                                <span class="text-[11px] uppercase tracking-wider text-secondary font-bold">Trạng thái xử lý:</span>
+                                <div>
+                                    <span class="font-label-sm text-label-sm px-2.5 py-0.5 rounded border font-bold inline-block mt-0.5 @MauTrangThai(s.TrangThai)">@NhanXuLy(s.TrangThai)</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div>
+                        <p class="text-[11px] uppercase tracking-wider text-secondary font-bold mb-1">Mô tả sự cố</p>
+                        <p class="text-body-sm text-on-surface">@(string.IsNullOrWhiteSpace(s.MoTa) ? "—" : s.MoTa)</p>
+                    </div>
+
+                    @if (!string.IsNullOrWhiteSpace(s.NoiDungGopY))
+                    {
+                        <div class="rounded-lg border border-outline-variant/70 px-3 py-2">
+                            <p class="text-[11px] uppercase tracking-wider text-secondary font-bold">Góp ý / Đề xuất của bạn</p>
+                            <p class="text-body-sm text-on-surface mt-0.5">@s.NoiDungGopY</p>
+                        </div>
+                    }
+
+                    <div>
+                        <p class="text-[11px] uppercase tracking-wider text-secondary font-bold mb-1">Thiết bị liên quan</p>
+                        @if (dsThietBi.Any())
+                        {
+                            <div class="flex flex-wrap gap-1.5">
+                                @foreach (var ct in dsThietBi)
+                                {
+                                    <span class="inline-flex items-center gap-1 px-2 py-1 rounded border border-surface-container bg-surface text-[12px]">
+                                        <span class="material-symbols-outlined text-[15px] text-primary">devices</span>
+                                        @ct.PhongThietBi?.NhanDienThietBi (@ct.PhongThietBi?.ThietBi?.TenThietBi)
+                                    </span>
+                                }
+                            </div>
+                        }
+                        else
+                        {
+                            <p class="text-body-sm text-on-surface-variant">Không chỉ định thiết bị cụ thể.</p>
+                        }
+                    </div>
+
+                    @if (!string.IsNullOrWhiteSpace(s.AnhDinhKem))
+                    {
+                        <div>
+                            <div class="flex items-center justify-between mb-1">
+                                <p class="text-[11px] uppercase tracking-wider text-secondary font-bold">Ảnh hiện trường đã gửi</p>
+                                <a href="@AnhUrl(s.AnhDinhKem)" target="_blank" rel="noopener" class="inline-flex items-center gap-1 text-[12px] text-primary hover:underline">
+                                    <span class="material-symbols-outlined text-[15px]">open_in_new</span>
+                                    Mở ảnh gốc
+                                </a>
+                            </div>
+                            <button type="button" data-anh="@AnhUrl(s.AnhDinhKem)" data-anh-mo-ta="Ảnh sự cố #SC-@s.MaSuCo.ToString("D5") — @(s.PhongHoc?.CodePhong ?? "")"
+                                    class="js-xem-anh block w-full rounded-lg border border-surface-container-highest overflow-hidden bg-surface-container-low hover:border-primary transition-colors">
+                                <img src="@AnhUrl(s.AnhDinhKem)" alt="Ảnh hiện trường sự cố" loading="lazy" class="w-full max-h-60 object-contain bg-surface-container-low" />
+                            </button>
+                            <p class="text-[11px] text-secondary mt-1 flex items-center gap-1">
+                                <span class="material-symbols-outlined text-[14px]">zoom_in</span>
+                                Nhấp vào ảnh để xem đầy đủ. Nếu ảnh không hiển thị, dùng “Mở ảnh gốc”.
+                            </p>
+                        </div>
+                    }
+
+                    <div class="rounded-lg bg-surface-container-low border border-surface-container px-3 py-2.5">
+                        <div class="flex flex-wrap items-center gap-2 text-[12px]">
+                            <span class="material-symbols-outlined text-[16px] text-primary">fact_check</span>
+                            <b class="text-on-surface">Đánh giá &amp; xử lý của CSVC</b>
+                            @if (s.NguoiXuLyNav != null)
+                            {
+                                <span class="text-secondary">· @s.NguoiXuLyNav.HoTen</span>
+                            }
+                            @if (s.NgayXuLy is DateTime ngayXuLy)
+                            {
+                                <span class="text-secondary">· @ngayXuLy.ToString("dd/MM/yyyy HH:mm")</span>
+                            }
+                            @if (s.KetQuaXuLy != null)
+                            {
+                                <span class="px-2 py-0.5 rounded font-semibold @(s.KetQuaXuLy == "RESTORED" ? "bg-tertiary-container/20 text-tertiary" : "bg-primary-fixed text-on-primary-fixed-variant")">@Catalogs.Label(Catalogs.KetQuaSuCo, s.KetQuaXuLy)</span>
+                            }
+                        </div>
+                        <p class="text-body-sm text-on-surface mt-1">
+                            @(string.IsNullOrWhiteSpace(s.DanhGia) ? "CSVC chưa cập nhật đánh giá cho báo cáo này." : s.DanhGia)
+                        </p>
+                        @if (s.PhongDieuChuyenNav != null)
+                        {
+                            <p class="mt-0.5 text-[12px] text-on-surface-variant">Phòng điều chuyển: <b>@s.PhongDieuChuyenNav.CodePhong</b></p>
+                        }
+                    </div>
+
+                    @if (!string.IsNullOrWhiteSpace(s.ThongBaoPhanHoi))
+                    {
+                        <div class="rounded-lg bg-tertiary-container/15 border border-tertiary/25 px-3 py-2.5">
+                            <div class="flex items-center gap-2 text-[12px] font-semibold text-tertiary">
+                                <span class="material-symbols-outlined text-[16px]">notifications_active</span>
+                                Thông báo từ CSVC
+                                @if (s.NgayXuLy is DateTime gui)
+                                {
+                                    <span class="font-normal text-on-surface-variant">· @gui.ToString("dd/MM/yyyy HH:mm")</span>
+                                }
+                            </div>
+                            <p class="text-body-sm mt-1">@s.ThongBaoPhanHoi</p>
+                        </div>
+                    }
+
+                    <div class="flex justify-end border-t border-surface-container pt-3">
+                        <button type="button" data-dong-modal class="px-4 py-1.5 bg-surface-container-lowest border border-outline-variant hover:bg-surface-container text-on-surface rounded-lg font-label-md text-label-md transition-colors">Đóng lại</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+}
+
+<div id="lightboxAnh" class="fixed inset-0 z-[60] bg-inverse-surface/85 backdrop-blur-xs items-center justify-center p-4 hidden">
+    <button type="button" data-dong-anh class="absolute top-4 right-4 w-10 h-10 rounded-full bg-surface-container-lowest/90 text-on-surface flex items-center justify-center hover:bg-surface-container-lowest transition-colors">
+        <span class="material-symbols-outlined">close</span>
+    </button>
+    <div class="max-w-full max-h-full flex flex-col items-center gap-2">
+        <img id="lightboxImg" src="" alt="Ảnh hiện trường sự cố" class="max-h-[82vh] max-w-full rounded-lg shadow-2xl object-contain bg-surface-container-lowest" />
+        <p id="lightboxMoTa" class="text-on-primary text-body-sm text-center"></p>
+    </div>
+</div>
+
+@section Scripts {
+<script>
+  (() => {
+    const mo = id => {
+      const el = document.getElementById(id);
+      if (!el) return;
+      el.classList.remove('hidden');
+      el.classList.add('flex');
+    };
+    const dong = el => {
+      if (!el) return;
+      el.classList.add('hidden');
+      el.classList.remove('flex');
+    };
+
+    document.querySelectorAll('[data-mo-modal]').forEach(btn => {
+      btn.addEventListener('click', () => mo(btn.dataset.moModal));
+    });
+    document.querySelectorAll('[data-dong-modal]').forEach(btn => {
+      btn.addEventListener('click', () => dong(btn.closest('.fixed.inset-0')));
+    });
+    document.querySelectorAll('.fixed.inset-0').forEach(el => {
+      el.addEventListener('click', e => { if (e.target === el) dong(el); });
+    });
+
+    const lightbox = document.getElementById('lightboxAnh');
+    const lightboxImg = document.getElementById('lightboxImg');
+    const lightboxMoTa = document.getElementById('lightboxMoTa');
+    document.querySelectorAll('.js-xem-anh').forEach(btn => {
+      btn.addEventListener('click', e => {
+        e.stopPropagation();
+        lightboxImg.alt = btn.dataset.anhMoTa || 'Ảnh hiện trường sự cố';
+        lightboxImg.src = btn.dataset.anh;
+        lightboxMoTa.textContent = btn.dataset.anhMoTa || '';
+        lightbox.classList.remove('hidden');
+        lightbox.classList.add('flex');
+      });
+    });
+    lightboxImg?.addEventListener('error', () => {
+      lightboxMoTa.textContent = 'Không tải được ảnh đã gửi. Bấm “Mở ảnh gốc” trong chi tiết đơn để mở trực tiếp.';
+    });
+    const dongAnh = () => {
+      lightbox.classList.add('hidden');
+      lightbox.classList.remove('flex');
+      lightboxImg.src = '';
+    };
+    lightbox?.addEventListener('click', e => {
+      if (e.target === lightbox || e.target.closest('[data-dong-anh]')) dongAnh();
+    });
+    lightboxImg?.addEventListener('click', e => e.stopPropagation());
+
+    document.addEventListener('keydown', e => {
+      if (e.key !== 'Escape') return;
+      if (!lightbox.classList.contains('hidden')) { dongAnh(); return; }
+      document.querySelectorAll('.fixed.inset-0.flex').forEach(dong);
+    });
+
+    document.querySelectorAll('.js-xuly-form').forEach(form => {
+      const kq = form.querySelector('.kq-select');
+      const khoi = form.querySelector('.phong-dich');
+      if (!kq || !khoi) return;
+      const capNhat = () => khoi.classList.toggle('hidden', kq.value !== 'TRANSFERRED');
+      kq.addEventListener('change', capNhat);
+      capNhat();
+    });
+
+    document.querySelectorAll('.phong-dich').forEach(khoi => {
+      const loc = khoi.querySelector('.loc-loai-phong');
+      const chon = khoi.querySelector('select[name="PhongDieuChuyen"]');
+      const dem = khoi.querySelector('.dem-phong-dich');
+      if (!loc || !chon) return;
+
+      const capNhat = () => {
+        const loai = loc.value;
+        let soPhong = 0;
+        for (const opt of chon.options) {
+          if (!opt.value) continue;
+          opt.hidden = !!loai && opt.dataset.loai !== loai;
+          if (!opt.hidden) soPhong++;
+        }
+        if (chon.selectedOptions[0]?.hidden) chon.value = '';
+        if (dem) {
+          dem.textContent = loai
+            ? `${soPhong} phòng thuộc loại đã chọn.`
+            : `${soPhong} phòng khả dụng. Chọn loại phòng để lọc nhanh danh sách.`;
+        }
+      };
+
+      loc.addEventListener('change', capNhat);
+      capNhat();
+    });
+  })();
+</script>
+}
